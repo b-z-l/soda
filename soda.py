@@ -18,7 +18,7 @@ def newProject():
         print("Error: Couldn't create new directory")
         print(e)
         sys.exit()
-    print("OK")
+    print("OKAY")
 
 # connect to database code is the same whether accessing existing or creating new
 # returns a sqlite3 connection object used to interact with the database
@@ -31,7 +31,7 @@ def connectToDB(path_to_db_file):
         print("Error: Couldn't connect to the database")
         print(e)
         sys.exit()
-    print("OK")
+    print("OKAY")
     return conn
 
 def closeDB(conn):
@@ -40,18 +40,17 @@ def closeDB(conn):
     print("Database closed.")
 
 # Main program entry here
+
 system('cls')
 
 print("SODA: Sensor Organizing Data Application")
-print()
-# i'm adding sleep delays, superfluous? maybe
-# it's good for human info processing in my humble opinion 
-
-#sleep(.5)
+# Adding a few little sleep delays to give the user
+# a moment to verify the config settings are correct
+sleep(2)
 try:
     import config
 except:
-    print("No config file found. Quitting...")
+    print("No config.py file found. Quitting...")
     sys.exit()
 
 storage_path = config.STORAGE_PATH
@@ -60,24 +59,29 @@ project_path = path.join(storage_path, project_name)
 database_name = project_name + ".db"
 database_path = path.join(project_path,database_name)
 
+# Config display
 
 print("Configuration settings imported from config.py")
-#sleep(1)
 print("Configuration check:")
+sleep(2)
 print()
-print("     Data storage path: " + storage_path)
-print("     Project name: " + project_name)
+print("     STORAGE_PATH: " + storage_path)
+print("     PROJECT_NAME: " + project_name)
 print()
+sleep(3)
+
+# Project existence dialog
 
 projectExists = path.exists(project_path)
 
 if (projectExists):
-    print("The " + project_name + " project directory already exists at " + project_path)
-    print("***If you continue you will be importing data into that project folder and database.***")
+    print("*** The " + project_name + " project directory already exists at " + project_path)
+    print("*** If you continue you will be importing data into that project folder and database.")
 else:
-    print("Project " + project_name + " does not currently exist")
-    print("A new project folder will be created at " + project_path)
-    print("A new database file will be created at " + database_path)
+    print("Project " + project_name + " does not currently exist at specified STORAGE_PATH");
+    print()
+    print("     A new project folder will be created at " + project_path)
+    print("     A new database file will be created at " + database_path)
 
 
 print()
@@ -86,7 +90,7 @@ while (command != "yes" and command != "no"):
     command = input("Are you sure you want to continue (yes or no)? ")
 
 if (command == "no"):
-    print("OK! Quitting...")
+    print("Okay! Quitting...")
     sys.exit()
 
 if (not projectExists):
