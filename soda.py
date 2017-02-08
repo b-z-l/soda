@@ -54,7 +54,7 @@ def getLocations(c):
         locations = [];
         while (location != None):
             locations.append(location)
-            location = location_c.fetchone()
+            location = locations_c.fetchone()
     return locations
             
 # getLocationID
@@ -64,21 +64,17 @@ def getLocations(c):
 # returns:
 #   integer - location id
 def getLocationID(c, location):
-    result = c.execute('''SELECT id FROM locations WHERE location = ?''', location)
+    loc_t = (location,)
+    result = c.execute('''SELECT id FROM locations WHERE location = ?''', loc_t)
     id = result.fetchone()
     if (id != None):
         return id[0]
     else:
-        c.execute('''INSERT INTO locations VALUES (NULL, ?)''', location)
+        c.execute('''INSERT INTO locations VALUES (NULL, ?)''', loc_t)
         result = c.execute('''SELECT last_insert_rowid()''')
         id = result.fetchone()
         return id[0]
     
-def setNewLocation():
-    command = "no"
-    while (command != "yes"):
-
-    return location_name
 
 # Main program entry here
 
@@ -87,7 +83,7 @@ system('cls')
 print("SODA: Sensor Organizing Data Application")
 # Adding a few little sleep delays to give the user
 # a moment to verify the config settings are correct
-sleep(2)
+#sleep(2)
 try:
     import config
 except:
@@ -104,12 +100,12 @@ database_path = path.join(project_path,database_name)
 
 print("Configuration settings imported from config.py")
 print("Configuration check:")
-sleep(2)
+#sleep(2)
 print()
 print("     STORAGE_PATH: " + storage_path)
 print("     PROJECT_NAME: " + project_name)
 print()
-sleep(3)
+#sleep(3)
 
 # Project existence dialog
 
@@ -144,35 +140,36 @@ c = conn.cursor()
 # location dialogue
 
 locations = getLocations(c)
-if (locations == None)
+if (locations == None):
     command = "no"
-    while (command != "yes")
+    while (command != "yes"):
         location_name = input("Please enter the name of new sensor location: ")
         print()
-        command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?"
+        command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?")
 else:
-    print("Please select a location option: "
-        for (i = 0, i < len(locations), i++):
-            print("     " + i + ": " + location[i][1]
-    newOption = len(locations) + 1
-    print("     " + newOption + ": " + "Add a new location")
+    print("Please select a location : ")
     print()
-    loc_select = -1
+    for i in range(len(locations)):
+        print("     " + str(i+1) + ": " + str(locations[i][1]))
+    newOption = len(locations) + 1
+    print("     " + str(newOption) + ": " + "Add a new location")
+    print()
+    loc_select = 1
     command = "no"
-    while (command != "yes")
-        while (loc_select < locations[0][0] || loc_select > newOption):
-            loc_select = input("Please enter a number to select an option: ")
+    while (command != "yes"):
+        loc_input = input("Please enter a number to select an option: ")
+        loc_select = int(loc_input)
+        if (loc_select < int(locations[0][0]) or loc_select > newOption): continue
         if (loc_select == newOption):
             location_name = input("Please enter the name of new sensor location: ")
         else:
-            location_name = locations[loc_select][1]
+            location_name = locations[loc_select-1][1]
         print()
-        command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?"
+        command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?")
 
 print("YOU HAVE SELECTED LOCATION " + location_name)
-    
-
-
+location_id = getLocationID(c, location_name)
+print("id: " + str(location_id))
 ### DATABASE TESTING
 c.execute("""CREATE TABLE IF NOT EXISTS awesomepossum(row_id INTEGER PRIMARY KEY, name text NO NULL)""")
 c.execute("""INSERT INTO awesomepossum VALUES(NULL, "Billy")""")
