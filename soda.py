@@ -3,8 +3,8 @@ from os import makedirs
 from os import path
 from os import system
 from shutil import copy
-from time import sleep
 import sqlite3
+from time import sleep
 
 
 # function for creating new project directory
@@ -39,6 +39,21 @@ def closeDB(conn):
     conn.close()
     print("Database closed.")
 
+# getLocations
+# argument: sqlite3 cursor object
+# returns a list of locations saved in the database or None
+def getLocations(c):
+    locations_c = c.execute('''SELECT * FROM locations''')
+    location = locations_c.fetchone()
+    if (location == None):
+        return None
+    else:
+        locations = [];
+        while (location != None):
+            locations.append(location[1])
+            location = location_c.fetchone()
+    return locations
+            
 # Main program entry here
 
 system('cls')
@@ -100,6 +115,8 @@ conn = connectToDB(database_path)
 # a cursor object is used to execute database inserts and queries
 c = conn.cursor()
 
+locations = getLocations(c)
+setLocation(c)
 
 ### DATABASE TESTING
 c.execute("""CREATE TABLE IF NOT EXISTS awesomepossum(row_id INTEGER PRIMARY KEY, name text NO NULL)""")

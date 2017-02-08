@@ -1,11 +1,10 @@
 # config.py
-# configuration file for 
-# SODA: Sensor Organizaing Data Application
+# SODA: Sensor Organizaing Data Application configuration file
   
 # name of project or locationwill dictate the name of the
 # folder which will hold data for one activity
 # It is recommended to not use spaces in this name.
-PROJECT_NAME = "Amherst"
+PROJECT_NAME = "PELLET_STUDY"
 
 # the project path is the top level directory where
 # data will be saved in its individual project folder.
