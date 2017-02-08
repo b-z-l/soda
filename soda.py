@@ -40,8 +40,11 @@ def closeDB(conn):
     print("Database closed.")
 
 # getLocations
-# argument: sqlite3 cursor object
-# returns a list of locations saved in the database or None
+# argument: 
+#   c: sqlite3 cursor object
+# returns:
+#  list of locations or
+#  None if none found
 def getLocations(c):
     locations_c = c.execute('''SELECT * FROM locations''')
     location = locations_c.fetchone()
@@ -54,6 +57,24 @@ def getLocations(c):
             location = location_c.fetchone()
     return locations
             
+# getLocationID
+# arguments:
+#   sqlite3 cursor object, c
+#   string, location name to get id for
+# returns:
+#   integer - location id
+def getLocationID(c, location):
+    result = c.execute('''SELECT id FROM locations WHERE location = ?''', location)
+    id = result.fetchone()
+    if (id != None):
+        return id[0]
+    else:
+        c.execute('''INSERT INTO locations VALUES (NULL, ?)''', location)
+        result = c.execute('''SELECT last_insert_rowid()''')
+        id = result.fetchone()
+        return id[0]
+    
+
 # Main program entry here
 
 system('cls')
