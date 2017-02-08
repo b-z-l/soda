@@ -43,7 +43,7 @@ def closeDB(conn):
 # argument: 
 #   c: sqlite3 cursor object
 # returns:
-#  list of locations or
+#  list of (id, location_name) tuples or
 #  None if none found
 def getLocations(c):
     locations_c = c.execute('''SELECT * FROM locations''')
@@ -53,7 +53,7 @@ def getLocations(c):
     else:
         locations = [];
         while (location != None):
-            locations.append(location[1])
+            locations.append(location)
             location = location_c.fetchone()
     return locations
             
@@ -74,6 +74,11 @@ def getLocationID(c, location):
         id = result.fetchone()
         return id[0]
     
+def setNewLocation():
+    command = "no"
+    while (command != "yes"):
+
+    return location_name
 
 # Main program entry here
 
@@ -136,8 +141,37 @@ conn = connectToDB(database_path)
 # a cursor object is used to execute database inserts and queries
 c = conn.cursor()
 
+# location dialogue
+
 locations = getLocations(c)
-setLocation(c)
+if (locations == None)
+    command = "no"
+    while (command != "yes")
+        location_name = input("Please enter the name of new sensor location: ")
+        print()
+        command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?"
+else:
+    print("Please select a location option: "
+        for (i = 0, i < len(locations), i++):
+            print("     " + i + ": " + location[i][1]
+    newOption = len(locations) + 1
+    print("     " + newOption + ": " + "Add a new location")
+    print()
+    loc_select = -1
+    command = "no"
+    while (command != "yes")
+        while (loc_select < locations[0][0] || loc_select > newOption):
+            loc_select = input("Please enter a number to select an option: ")
+        if (loc_select == newOption):
+            location_name = input("Please enter the name of new sensor location: ")
+        else:
+            location_name = locations[loc_select][1]
+        print()
+        command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?"
+
+print("YOU HAVE SELECTED LOCATION " + location_name)
+    
+
 
 ### DATABASE TESTING
 c.execute("""CREATE TABLE IF NOT EXISTS awesomepossum(row_id INTEGER PRIMARY KEY, name text NO NULL)""")
