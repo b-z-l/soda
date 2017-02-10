@@ -1,10 +1,142 @@
 import sys
-from os import makedirs
-from os import path
-from os import system
+import os
 from shutil import copy
 import sqlite3
+import win32api, win32con, win32gui
+from ctypes import *
+import threading
 from time import sleep
+
+
+class StoppableThread(threading.Thread):
+    """Thread class with a stop() method. The thread itself has to check
+    regularly for the stopped() condition."""
+
+    def __init__(self):
+        super(StoppableThread, self).__init__()
+        self._stop = threading.Event()
+
+    def stop(self):
+        self._stop.set()
+
+    def stopped(self):
+        return self._stop.isSet()
+
+#
+# Device change events (WM_DEVICECHANGE wParam)
+#
+DBT_DEVICEARRIVAL = 0x8000
+DBT_DEVICEQUERYREMOVE = 0x8001
+DBT_DEVICEQUERYREMOVEFAILED = 0x8002
+DBT_DEVICEMOVEPENDING = 0x8003
+DBT_DEVICEREMOVECOMPLETE = 0x8004
+DBT_DEVICETYPESSPECIFIC = 0x8005
+DBT_CONFIGCHANGED = 0x0018
+
+#
+# type of device in DEV_BROADCAST_HDR
+#
+DBT_DEVTYP_OEM = 0x00000000
+DBT_DEVTYP_DEVNODE = 0x00000001
+DBT_DEVTYP_VOLUME = 0x00000002
+DBT_DEVTYPE_PORT = 0x00000003
+DBT_DEVTYPE_NET = 0x00000004
+
+#
+# media types in DBT_DEVTYP_VOLUME
+#
+DBTF_MEDIA = 0x0001
+DBTF_NET = 0x0002
+
+WORD = c_ushort
+DWORD = c_ulong
+class DEV_BROADCAST_HDR(Structure):
+    _fields_ = [
+        ("dbch_size", DWORD),
+        ("dbch_devicetype", DWORD),
+        ("dbch_reserved", DWORD)
+    ]
+
+
+class DEV_BROADCAST_VOLUME(Structure):
+    _fields_ = [
+        ("dbcv_size", DWORD),
+        ("dbcv_devicetype", DWORD),
+        ("dbcv_reserved", DWORD),
+        ("dbcv_unitmask", DWORD),
+        ("dbcv_flags", WORD)
+    ]
+
+
+def drive_from_mask(mask):
+    n_drive = 0
+    while 1:
+        if (mask & (2 ** n_drive)):
+            return n_drive
+        else:
+            n_drive += 1
+
+
+class Notification():
+    def __init__(self):
+        message_map = {
+            win32con.WM_DEVICECHANGE: self.onDeviceChange,
+	    win32con.WM_DESTROY: self.onDestroy
+        }
+
+        wc = win32gui.WNDCLASS()
+        hinst = wc.hInstance = win32api.GetModuleHandle(None)
+        wc.lpszClassName = "DeviceChangeDemo"
+        wc.style = win32con.CS_VREDRAW | win32con.CS_HREDRAW
+        wc.hCursor = win32gui.LoadCursor(0, win32con.IDC_ARROW)
+        wc.hbrBackground = win32con.COLOR_WINDOW
+        wc.lpfnWndProc = message_map
+        classAtom = win32gui.RegisterClass(wc)
+        style = win32con.WS_OVERLAPPED | win32con.WS_SYSMENU
+        self.hwnd = win32gui.CreateWindow(
+            classAtom,
+            "Device Change Demo",
+            style,
+            0, 0,
+            win32con.CW_USEDEFAULT, win32con.CW_USEDEFAULT,
+            0, 0,
+            hinst, None
+        )
+    def onDestroy(hwnd, msg, wparam, lparam):
+        win32gui.PostQuitMessage(0)
+        print("I DIE")
+        return
+
+    def onDeviceChange(self, hwnd, msg, wparam, lparam):
+        #
+        # WM_DEVICECHANGE:
+        #  wParam - type of change: arrival, removal etc.
+        #  lParam - what's changed?
+        #    if it's a volume then...
+        #  lParam - what's changed more exactly
+        #
+        global DRIVE
+        dev_broadcast_hdr = DEV_BROADCAST_HDR.from_address(lparam)
+
+        if wparam == DBT_DEVICEARRIVAL:
+            #print("Something's arrived")
+
+            if dev_broadcast_hdr.dbch_devicetype == DBT_DEVTYP_VOLUME:
+                #print("It's a volume!")
+
+                dev_broadcast_volume = DEV_BROADCAST_VOLUME.from_address(lparam)
+                if dev_broadcast_volume.dbcv_flags & DBTF_MEDIA:
+                    print("with some media")
+                drive_letter = drive_from_mask(dev_broadcast_volume.dbcv_unitmask)
+                DRIVE = chr(ord("A") + drive_letter) + ':\\'                       
+                print("Drive", DRIVE, "inserted")
+                yesDevice.set()
+        if wparam == DBT_DEVICEREMOVECOMPLETE:
+                DRIVE = None
+                print("Safe to remove drive")
+                #print ("Drive ", chr(ord("A") + drive_letter, " being ejected!"));
+
+        return 1
 
 
 # function for creating new project directory
@@ -48,18 +180,15 @@ def closeDB(conn):
 def getLocations(c):
     locations_c = c.execute('''SELECT * FROM locations''')
     location = locations_c.fetchone()
-    if (location == None):
-        return None
-    else:
-        locations = [];
-        while (location != None):
-            locations.append(location)
-            location = locations_c.fetchone()
+    locations = [];
+    while (location != None):
+        locations.append(location)
+        location = locations_c.fetchone()
     return locations
             
 # getLocationID
 # arguments:
-#   sqlite3 cursor object, c
+#   cursor object, c
 #   string, location name to get id for
 # returns:
 #   integer - location id
@@ -75,10 +204,25 @@ def getLocationID(c, location):
         id = result.fetchone()
         return id[0]
     
+months = {
+    0:'Unknown',
+    1:'January',
+    2:'February',
+    3:'March',
+    4:'April',
+    5:'May',
+    6:'June',
+    7:'July',
+    8:'August',
+    9:'September',
+    10:'October',
+    11:'November',
+    12:'December'
+}
 
-# Main program entry here
+### Main program entry here
 
-system('cls')
+os.system('cls')
 
 print("SODA: Sensor Organizing Data Application")
 # Adding a few little sleep delays to give the user
@@ -92,9 +236,11 @@ except:
 
 storage_path = config.STORAGE_PATH
 project_name = config.PROJECT_NAME.upper()
-project_path = path.join(storage_path, project_name)
+project_path = os.path.join(storage_path, project_name)
 database_name = project_name + ".db"
-database_path = path.join(project_path,database_name)
+database_path = os.path.join(project_path,database_name)
+global DRIVE
+DRIVE = None
 
 # Config display
 
@@ -109,11 +255,12 @@ print()
 
 # Project existence dialog
 
-projectExists = path.exists(project_path)
+projectExists = os.path.exists(project_path)
 
 if (projectExists):
-    print("*** The " + project_name + " project directory already exists at " + project_path)
-    print("*** If you continue you will be importing data into that project folder and database.")
+    print("*** The " + project_name + " project directory already exists at: \n\t" + project_path)
+    print()
+    print("*** If you continue you will be importing data into that\n    project folder and database.")
 else:
     print("Project " + project_name + " does not currently exist at specified STORAGE_PATH");
     print()
@@ -140,63 +287,110 @@ c = conn.cursor()
 # location dialogue
 
 locations = getLocations(c)
-if (locations == None):
-    command = "no"
-    while (command != "yes"):
-        location_name = input("Please enter the name of new sensor location: ")
-        print()
-        command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?")
-else:
-    print("Please select a location : ")
+#if (locations == None):
+ #   command = "no"
+  #  while (command != "yes"):
+   #     location_name = input("Please enter the name of new sensor location: ")
+    #    print()
+     #   command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?")
+#else:
+command = "no"
+while (command != "yes"):
+    print("Please select location of sensor(s): ")
+    print("This is important data to later select sensor data based on where it was.")
     print()
+
     for i in range(len(locations)):
         print("     " + str(i+1) + ": " + str(locations[i][1]))
     newOption = len(locations) + 1
     print("     " + str(newOption) + ": " + "Add a new location")
     print()
-    loc_select = 1
-    command = "no"
-    while (command != "yes"):
-        loc_input = input("Please enter a number to select an option: ")
-        loc_select = int(loc_input)
-        if (loc_select < int(locations[0][0]) or loc_select > newOption): continue
-        if (loc_select == newOption):
-            location_name = input("Please enter the name of new sensor location: ")
-        else:
-            location_name = locations[loc_select-1][1]
-        print()
-        command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?")
+    loc_select = -1
+    # while (loc_select < int(locations[0][0]) or loc_select > newOption): 
+    while (loc_select < 1 or loc_select > newOption): 
+        try:
+            loc_select = int(input("Please enter a number to select an option: "),10)
+        except:
+            loc_select = -1
+    if (loc_select == newOption):
+        location_name = input("Please enter the name of new sensor location: ")
+    else:
+        location_name = locations[loc_select-1][1]
+    command = input("Location name: " + location_name + "\nDoes this look okay (yes or no)? ")
 
-print("YOU HAVE SELECTED LOCATION " + location_name)
 location_id = getLocationID(c, location_name)
-print("id: " + str(location_id))
-### DATABASE TESTING
-c.execute("""CREATE TABLE IF NOT EXISTS awesomepossum(row_id INTEGER PRIMARY KEY, name text NO NULL)""")
-c.execute("""INSERT INTO awesomepossum VALUES(NULL, "Billy")""")
-print("INSERT BABY")
-closeDB(conn);
+print("YOU HAVE SELECTED LOCATION " + location_name + " with id " + str(location_id))
+closeDB(conn)
 
 
+if __name__ == '__main__':
+    
+    yesDevice = threading.Event()
+    stopThread = threading.Event()
+
+    def winLoop():
+        global DRIVE
+        w = Notification()
+        while(1):
+            win32gui.PumpWaitingMessages()
+            sleep(.1)
+        print("wth man")
+    
+    worker1 = threading.Thread(name='message loop', target=winLoop)
+    worker1.start()
+        
+    while (True): 
+        if (DRIVE != None):
+            command = input("What do you want to do?")
+            if (command == 'get'):
+                files = os.listdir(path=DRIVE)
+                print(files)
+            elif (command == 'e'):
+                removedrive = 'removedrive ' + DRIVE + ' -L'
+                o = os.popen(removedrive).read()
+            elif (command == 'q'):
+                win32gui.PostQuitMessage(0)
+                removedrive = 'removedrive ' + DRIVE + ' -L'
+                o = os.popen(removedrive).read()
+                break
+        else:
+            print("(Re)Insert an SD card with sensor datas!")
+            # wait for a drive to show up
+            yesDevice.wait()
+            yesDevice.clear()
+            files = os.listdir(path=DRIVE) #get paths too
+            files = [i for i in files if 'SENSOR' in i]
+            if (len(files) == 0):
+                print("No sensor files found on this drive :(")
+            else:
+                try:
+                    file_info = []
+                    for f in files:
+                        # construct potential destination path
+                        # project_path\location\Jan\1\SENSOR001\
+                        print(f)
+                        f_s = f.split('_')
+                        print("f_s[1]: " + f_s[1] + " " + months[int(f_s[1])])
+                        month = months[int(f_s[1])] if int(f_s[1]) in range(1,12) else months[0]
+                        dest_path = os.path.join(project_path, location_name, f_s[0], month)
+                        file_info.append(
+                            (f, 
+                            os.path.join(DRIVE,f), 
+                            dest_path, 
+                            os.path.exists(os.path.join(dest_path,f)))
+                        )
+                    print(file_info)
+                  #  fileData = getFileData
+                    # data we need: current file path, file destination path
+                    # does the file already exist, in dest dir?
+                    # build this structure (filename,currpath,destpath,toTransfer)
+                except Exception as e:
+                    print(e)
+
+                
+
+            
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    print("this is the end...")
 
