@@ -144,7 +144,7 @@ def newProject():
     print("Creating new directory " + project_path + ".......", end="")
     # make project file path
     try:
-        makedirs(project_path)
+        os.makedirs(project_path)
     except Exception as e:
         print()
         print("Error: Couldn't create new directory")
@@ -154,7 +154,7 @@ def newProject():
 
 # connect to database code is the same whether accessing existing or creating new
 # returns a sqlite3 connection object used to interact with the database
-def connectToDB(path_to_db_file):
+def connectToDB(path_to_db_file, project_exists):
     print("Connecting to database at " + database_path + ".......", end="")
     try:
         conn = sqlite3.connect(path_to_db_file)
@@ -164,6 +164,26 @@ def connectToDB(path_to_db_file):
         print(e)
         sys.exit()
     print("OKAY")
+    
+    if (not project_exists):
+        try:
+            import schema
+        except Exception as e:
+            print()
+            print("Error: Couldn't find schema.py. This should be a file with a list named schema holding tuples which contain one sqlite CREATE command each")
+            print(e)
+            sys.exit()
+
+        try:
+            c = conn.cursor()
+            print("Creating new database schema.......",end="")
+            for i in schema.schema:
+                c.execute(i[0])
+        except Exception as e:
+            print("Error: Problem creating new database")
+            print(e)
+        print("OKAY")
+                
     return conn
 
 def closeDB(conn):
@@ -204,21 +224,6 @@ def getLocationID(c, location):
         id = result.fetchone()
         return id[0]
     
-months = {
-    0:'Unknown',
-    1:'January',
-    2:'February',
-    3:'March',
-    4:'April',
-    5:'May',
-    6:'June',
-    7:'July',
-    8:'August',
-    9:'September',
-    10:'October',
-    11:'November',
-    12:'December'
-}
 
 ### Main program entry here
 
@@ -280,7 +285,7 @@ if (command == "no"):
 if (not projectExists):
     newProject()
 
-conn = connectToDB(database_path)
+conn = connectToDB(database_path, projectExists)
 # a cursor object is used to execute database inserts and queries
 c = conn.cursor()
 
@@ -339,55 +344,70 @@ if __name__ == '__main__':
     worker1 = threading.Thread(name='message loop', target=winLoop)
     worker1.start()
         
-    while (True): 
-        if (DRIVE != None):
-            command = input("What do you want to do?")
-            if (command == 'get'):
-                files = os.listdir(path=DRIVE)
-                print(files)
-            elif (command == 'e'):
-                removedrive = 'removedrive ' + DRIVE + ' -L'
-                o = os.popen(removedrive).read()
-            elif (command == 'q'):
-                win32gui.PostQuitMessage(0)
-                removedrive = 'removedrive ' + DRIVE + ' -L'
-                o = os.popen(removedrive).read()
-                break
-        else:
-            print("(Re)Insert an SD card with sensor datas!")
-            # wait for a drive to show up
-            yesDevice.wait()
-            yesDevice.clear()
-            files = os.listdir(path=DRIVE) #get paths too
-            files = [i for i in files if 'SENSOR' in i]
-            if (len(files) == 0):
-                print("No sensor files found on this drive :(")
-            else:
-                try:
-                    file_info = []
-                    for f in files:
-                        # construct potential destination path
-                        # project_path\location\Jan\1\SENSOR001\
-                        print(f)
-                        f_s = f.split('_')
-                        print("f_s[1]: " + f_s[1] + " " + months[int(f_s[1])])
-                        month = months[int(f_s[1])] if int(f_s[1]) in range(1,12) else months[0]
-                        dest_path = os.path.join(project_path, location_name, f_s[0], month)
-                        file_info.append(
-                            (f, 
-                            os.path.join(DRIVE,f), 
-                            dest_path, 
-                            os.path.exists(os.path.join(dest_path,f)))
-                        )
-                    print(file_info)
-                  #  fileData = getFileData
-                    # data we need: current file path, file destination path
-                    # does the file already exist, in dest dir?
-                    # build this structure (filename,currpath,destpath,toTransfer)
-                except Exception as e:
-                    print(e)
 
-                
+### Main program loop
+
+months = {
+    '0':'Unknown',
+    '1':'January',
+    '2':'February',
+    '3':'March',
+    '4':'April',
+    '5':'May',
+    '6':'June',
+    '7':'July',
+    '8':'August',
+    '9':'September',
+    '10':'October',
+    '11':'November',
+    '12':'December'
+}
+
+while (True): 
+    if (DRIVE != None):
+        command = input("What do you want to do? ")
+        if (command == 'get'):
+            files = os.listdir(path=DRIVE)
+            print(files)
+        elif (command == 'e'):
+            removedrive = 'removedrive ' + DRIVE + ' -L'
+            o = os.popen(removedrive).read()
+        elif (command == 'q'):
+            win32gui.PostQuitMessage(0)
+            removedrive = 'removedrive ' + DRIVE + ' -L'
+            o = os.popen(removedrive).read()
+            break
+    else:
+        print("(Re)Insert an SD card with sensor datas!")
+        # wait for a drive to show up
+        yesDevice.wait()
+        yesDevice.clear()
+        files = os.listdir(path=DRIVE) #get paths too
+        files = [i for i in files if 'SENSOR' in i]
+        if (len(files) == 0):
+            print("No sensor files found on this drive :(")
+        else:
+            try:
+                file_info = []
+                for f in files:
+                    # construct potential destination path
+                    # project_path\location\Jan\1\SENSOR001\
+                    f_s = f.split('_')
+                    month = months[f_s[1]] if int(f_s[1]) in range(1,12) else months['0']
+                    dest_path = os.path.join(project_path, location_name, f_s[0], month)
+                    # build this tuple (filename,currpath,destpath,toTransfer)
+                    file_info.append(
+                        (f, 
+                        os.path.join(DRIVE,f), 
+                        dest_path, 
+                        not os.path.exists(os.path.join(dest_path,f)))
+                    )
+                print(file_info)
+              #  fileData = getFileData
+                # data we need: current file path, file destination path
+                # does the file already exist, in dest dir?
+            except Exception as e:
+                    print(e)
 
             
 
