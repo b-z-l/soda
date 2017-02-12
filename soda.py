@@ -135,6 +135,10 @@ class Notification():
         if wparam == DBT_DEVICEREMOVECOMPLETE:
                 DRIVE = None
                 print("Safe to remove drive")
+                if (stopThread.is_set()):
+                    win32gui.PostQuitMessage(0)
+                    print("I DIE")
+                    return
                 #print ("Drive ", chr(ord("A") + drive_letter, " being ejected!"));
 
         return 1
@@ -188,9 +192,13 @@ def connectToDB(path_to_db_file, project_exists):
     return conn
 
 def closeDB(conn):
-    conn.commit()
-    conn.close()
-    print("Database closed.")
+    try:
+        conn.commit()
+        conn.close()
+        print("Database closed.")
+    except Exception as e:
+        print(e)
+
 
 # getLocations
 # argument: 
@@ -400,13 +408,13 @@ if __name__ == '__main__':
     def winLoop():
         global DRIVE
         w = Notification()
-        while(1):
-            win32gui.PumpWaitingMessages()
-            sleep(.1)
-        print("wth man")
+        win32gui.PumpMessages()
+        #while(1):
+        #    win32gui.PumpWaitingMessages()
+        #    sleep(.1)
     
-    worker1 = threading.Thread(name='message loop', target=winLoop)
-    worker1.start()
+    SDlisten = threading.Thread(name='message loop', target=winLoop)
+    SDlisten.start()
         
 
 ### Main program loop
@@ -423,55 +431,74 @@ def cardRead(command):
     files = retrieveDataFiles()
     if (len(files) == 0):
         print ("No sensor files found on volume " + DRIVE)
-        return False
     else:
         fileImport(files)
         if command == 'a':
-            importFiles()
-        return True
+            print("AUTO MODE: someday you may be able to leave this...maybe with an input in it's own thread...who knows")
+            importFiles(files)
+            ejectDrive()
+    return files
 
-def importFiles():
-    for i in range(10):
-        print("AAA", end="\r")
+def importFiles(files):
+    # first just copy over files
+    # 
+    # do I load the entire file into memory?
+    # should i read from SD first, try inserts, then if successful, copy the file.. that sounds good...
+    
+    # wrap in try
+
+    # derive sensor # from file name? no...
+    # use csv library
+    # read in each line of file
+    #  - we need to look for some special lines
+    #    - sensor info line, hardware IDs
+    #    - look for header indicating start of data
+    #    - throw away all lines until then
+    #  read in line, format tuple of data to INSERT
+    #  try insertion
+    #  after entire file is inserted, commit change
+    #
+    # no more files, CLOSE DB 
+    for i in range(5):
+        print("AAAAAAAAA", end="\r")
         sleep(.2)
         print("\b")
-        print("BBB",end="\r")
+        print("BBBBBBBBB",end="\r")
         sleep(.2)
         print("\b")
-        print("CCC",end="\r")
+        print("CCCCCCCCC",end="\r")
         sleep(.2)
         print("\b")
-        print("DDD",end="\r")
+        print("DDDDDDDDD",end="\r")
         sleep(.2)
         print("\b")
     print("Importing files..... psych!")
 
 
-def commandPrompt():
+def commandPrompt(files):
     if filesPresent:
         print("(i)import files (a)auto import ", end = "")
     command = input("(e)eject drive (q)quit: ")
-    if command[0] == 'i':
-        importFiles()
-        ejectDrive()
-    elif command[0] == 'a':
+    if command[0] == 'a':
         print("Auto import mode")
-        importFiles()
+    if command[0] == 'a' or command[0] == 'i':
+        importFiles(files)
         ejectDrive()
     elif command[0] == 'e':
         ejectDrive()
-    elif (command[0] == 'q' or command == 'quit'):
+    elif (command[0] == 'q':
         win32gui.PostQuitMessage(0)
+        stopThread.set()
         ejectDrive()
     return command
 
 
-command = 'z'
-filesPresent = cardRead(command)
+command = 'none'
+files = cardRead(command)
 try:
     while (True):
         if command[0] != 'a':
-            command = commandPrompt()
+            command = commandPrompt(files)
         if command[0] == 'q':
             break
         cardRead(command)
@@ -481,5 +508,7 @@ except Exception as e:
 
 print("this is the end...")
 if command[0] == 'q':
-    sys.exit()
-    print("why u no work :(")
+   #win32gui.sendmessage
+    worker1.join()
+    closeDB()
+    print('Bye!')
