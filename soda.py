@@ -1,6 +1,7 @@
 import sys
 import os
 from shutil import copy
+from shutil import rmtree
 import sqlite3
 import win32api, win32con, win32gui
 from ctypes import *
@@ -223,7 +224,70 @@ def getLocationID(c, location):
         result = c.execute('''SELECT last_insert_rowid()''')
         id = result.fetchone()
         return id[0]
-    
+
+# retrieveDataFiles
+# Looks for sensor data files on an inserted drive, checks for the
+# string "SENSORS" in the file name to establish
+# returns:
+#   List of tuples: [(filename,currpath,destpath,toTransfer), ...)]
+def retrieveDataFiles(): 
+     files = os.listdir(path=DRIVE) #get paths too
+     files = [i for i in files if 'SENSOR' in i]
+     file_info = []
+     #if (len(files) == 0):
+     #    print("No sensor files found on this drive :(")
+     #else:
+     try:
+         # handy dictionary to build destination file path
+         months = {
+             '0':'Unknown',
+             '1':'January',
+             '2':'February',
+             '3':'March',
+             '4':'April',
+             '5':'May',
+             '6':'June',
+             '7':'July',
+             '8':'August',
+             '9':'September',
+             '10':'October',
+             '11':'November',
+             '12':'December'
+         }
+         for f in files:
+             # construct destination path
+             # project_path\location\Jan\1\SENSOR001\
+             f_s = f.split('_')
+             month = months[f_s[1]] if int(f_s[1]) in range(1,12) else months['0']
+             dest_path = os.path.join(project_path, location_name, f_s[0], month)
+             file_info.append(
+                 (f, 
+                 os.path.join(DRIVE,f), 
+                 dest_path, 
+                 not os.path.exists(os.path.join(dest_path,f)))
+             )
+     except Exception as e:
+             print(e)
+             return [] 
+     return file_info
+
+
+# fileImport
+# lists sensor files to be transferred 
+def fileImport(files):
+    print("Sensor files present on drive " + DRIVE)
+    print()
+    # List of tuples: [(filename, currpath, destpath, toTransfer), ...)]
+    transferCount = 0
+    for i in files:
+        print("    " + i[0], end = "")
+        if ( i[3] == True):
+            print(" *")
+            transferCount = transferCount + 1
+    print()
+    print(str(len(files)) + " sensor data files found. " + str(transferCount) + " are new and can be transfered.")
+        
+
 
 ### Main program entry here
 
@@ -347,70 +411,75 @@ if __name__ == '__main__':
 
 ### Main program loop
 
-months = {
-    '0':'Unknown',
-    '1':'January',
-    '2':'February',
-    '3':'March',
-    '4':'April',
-    '5':'May',
-    '6':'June',
-    '7':'July',
-    '8':'August',
-    '9':'September',
-    '10':'October',
-    '11':'November',
-    '12':'December'
-}
+def ejectDrive():
+    removedrive = 'removedrive ' + DRIVE + ' -L'
+    o = os.popen(removedrive).read()
 
-while (True): 
-    if (DRIVE != None):
-        command = input("What do you want to do? ")
-        if (command == 'get'):
-            files = os.listdir(path=DRIVE)
-            print(files)
-        elif (command == 'e'):
-            removedrive = 'removedrive ' + DRIVE + ' -L'
-            o = os.popen(removedrive).read()
-        elif (command == 'q'):
-            win32gui.PostQuitMessage(0)
-            removedrive = 'removedrive ' + DRIVE + ' -L'
-            o = os.popen(removedrive).read()
-            break
+def cardRead(command):
+    print("(Re)Insert an SD card with sensor datas!")
+    # wait for a drive to show up
+    yesDevice.wait()
+    yesDevice.clear()
+    files = retrieveDataFiles()
+    if (len(files) == 0):
+        print ("No sensor files found on volume " + DRIVE)
+        return False
     else:
-        print("(Re)Insert an SD card with sensor datas!")
-        # wait for a drive to show up
-        yesDevice.wait()
-        yesDevice.clear()
-        files = os.listdir(path=DRIVE) #get paths too
-        files = [i for i in files if 'SENSOR' in i]
-        if (len(files) == 0):
-            print("No sensor files found on this drive :(")
-        else:
-            try:
-                file_info = []
-                for f in files:
-                    # construct potential destination path
-                    # project_path\location\Jan\1\SENSOR001\
-                    f_s = f.split('_')
-                    month = months[f_s[1]] if int(f_s[1]) in range(1,12) else months['0']
-                    dest_path = os.path.join(project_path, location_name, f_s[0], month)
-                    # build this tuple (filename,currpath,destpath,toTransfer)
-                    file_info.append(
-                        (f, 
-                        os.path.join(DRIVE,f), 
-                        dest_path, 
-                        not os.path.exists(os.path.join(dest_path,f)))
-                    )
-                print(file_info)
-              #  fileData = getFileData
-                # data we need: current file path, file destination path
-                # does the file already exist, in dest dir?
-            except Exception as e:
-                    print(e)
+        fileImport(files)
+        if command == 'a':
+            importFiles()
+        return True
 
-            
+def importFiles():
+    for i in range(10):
+        print("AAA", end="\r")
+        sleep(.2)
+        print("\b")
+        print("BBB",end="\r")
+        sleep(.2)
+        print("\b")
+        print("CCC",end="\r")
+        sleep(.2)
+        print("\b")
+        print("DDD",end="\r")
+        sleep(.2)
+        print("\b")
+    print("Importing files..... psych!")
 
 
-    print("this is the end...")
+def commandPrompt():
+    if filesPresent:
+        print("(i)import files (a)auto import ", end = "")
+    command = input("(e)eject drive (q)quit: ")
+    if command[0] == 'i':
+        importFiles()
+        ejectDrive()
+    elif command[0] == 'a':
+        print("Auto import mode")
+        importFiles()
+        ejectDrive()
+    elif command[0] == 'e':
+        ejectDrive()
+    elif (command[0] == 'q' or command == 'quit'):
+        win32gui.PostQuitMessage(0)
+        ejectDrive()
+    return command
 
+
+command = 'z'
+filesPresent = cardRead(command)
+try:
+    while (True):
+        if command[0] != 'a':
+            command = commandPrompt()
+        if command[0] == 'q':
+            break
+        cardRead(command)
+except Exception as e:
+    print(e)
+    sys.exit()
+
+print("this is the end...")
+if command[0] == 'q':
+    sys.exit()
+    print("why u no work :(")
