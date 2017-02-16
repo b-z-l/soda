@@ -175,7 +175,7 @@ def connectToDB(path_to_db_file, project_exists):
             import schema
         except Exception as e:
             print()
-            print("Error: Couldn't find schema.py. This should be a file with a list named schema holding tuples which contain one sqlite CREATE command each")
+            print("Error: Couldn't find schema.py. This should be a file with a list named schema holding strings which contain one sqlite CREATE command each")
             print(e)
             sys.exit()
 
@@ -183,10 +183,11 @@ def connectToDB(path_to_db_file, project_exists):
             c = conn.cursor()
             print("Creating new database schema.......",end="")
             for i in schema.schema:
-                c.execute(i[0])
+                c.execute(i)
         except Exception as e:
             print("Error: Problem creating new database")
             print(e)
+            sys.exit()
         print("OKAY")
                 
     return conn
@@ -407,6 +408,7 @@ if __name__ == '__main__':
 
     def winLoop():
         global DRIVE
+        global w
         w = Notification()
         win32gui.PumpMessages()
         #while(1):
@@ -432,7 +434,7 @@ def cardRead(command):
     if (len(files) == 0):
         print ("No sensor files found on volume " + DRIVE)
     else:
-        fileImport(files)
+        fileImport(files) #list files
         if command == 'a':
             print("AUTO MODE: someday you may be able to leave this...maybe with an input in it's own thread...who knows")
             importFiles(files)
@@ -460,36 +462,35 @@ def importFiles(files):
     #
     # no more files, CLOSE DB 
     for i in range(5):
-        print("AAAAAAAAA", end="\r")
+        print("AAAAAAAAAAAAAAAAAA", end="\r")
         sleep(.2)
         print("\b")
-        print("BBBBBBBBB",end="\r")
+        print("BBBBBBBBBBBBBBBBBB",end="\r")
         sleep(.2)
         print("\b")
-        print("CCCCCCCCC",end="\r")
+        print("CCCCCCCCCCCCCCCCCC",end="\r")
         sleep(.2)
         print("\b")
-        print("DDDDDDDDD",end="\r")
+        print("DDDDDDDDDDDDDDDDDD",end="\r")
         sleep(.2)
         print("\b")
     print("Importing files..... psych!")
 
-
 def commandPrompt(files):
-    if filesPresent:
+    if len(files) > 0:
         print("(i)import files (a)auto import ", end = "")
     command = input("(e)eject drive (q)quit: ")
     if command[0] == 'a':
         print("Auto import mode")
+
     if command[0] == 'a' or command[0] == 'i':
         importFiles(files)
-        ejectDrive()
-    elif command[0] == 'e':
-        ejectDrive()
-    elif (command[0] == 'q':
+      #  ejectDrive()
+    #elif command[0] == 'e':
+    elif command[0] == 'q':
         win32gui.PostQuitMessage(0)
         stopThread.set()
-        ejectDrive()
+    ejectDrive()
     return command
 
 
@@ -504,11 +505,18 @@ try:
         cardRead(command)
 except Exception as e:
     print(e)
-    sys.exit()
+    command = 'q'
 
+global w
 print("this is the end...")
 if command[0] == 'q':
    #win32gui.sendmessage
-    worker1.join()
+   # w.onDestroy()
+    SDlisten.join()
     closeDB()
     print('Bye!')
+
+
+    # sample data tuples
+    # sameplesensor = (1, 1, 1, 1, 1, 1, 1, 1, 1, '2017
+    # sensorinsert = '''INSERT INTO sensors 1, 1, 1, 1, 1, 1, 1, 1, 1, date('now')'''
