@@ -99,7 +99,7 @@
 
 // logging options
 #define LOG_INTERVAL 2000
-#define LOG_TO_SERIAL falsed
+#define LOG_TO_SERIAL true
 
 // sleep and wake settings in milliseconds
 // e.g.
@@ -242,17 +242,17 @@ void setup() {
   // This information is read into the database to store the current
   // sensor component configuration.
   logfile.println(F("# Sensor Configuration:"));
-  logfile.print(F("# config_date: CONFIG_DATE"));
-  logfile.print(F("# sensor_id: SENSOR_ID"));
-  logfile.print(F("# enclosure_id: ENCLOSURE_ID"));
-  logfile.print(F("# arduino_id: ARDUINO_ID"));
-  logfile.print(F("# datashield_id: DATASHIELD_ID"));
-  logfile.print(F("# sdcard_id: SDCARD_ID"));
-  logfile.print(F("# shinyei_id: SHINYEI_ID"));
-  logfile.print(F("# o3_sensor_id: O3_SENSOR_ID"));
-  logfile.print(F("# co_sensor_id: CO_SENSOR_ID"));
-  logfile.print(F("# dht22_id: DHT22_ID"));
-  logfile.print(F("# If you swap parts record the new component ID and new configuration date in the file SENSORHERE.ino"));
+  logfile.println(F("# config_date: CONFIG_DATE"));
+  logfile.println(F("# sensor_id: SENSOR_ID"));
+  logfile.println(F("# enclosure_id: ENCLOSURE_ID"));
+  logfile.println(F("# arduino_id: ARDUINO_ID"));
+  logfile.println(F("# datashield_id: DATASHIELD_ID"));
+  logfile.println(F("# sdcard_id: SDCARD_ID"));
+  logfile.println(F("# shinyei_id: SHINYEI_ID"));
+  logfile.println(F("# o3_sensor_id: O3_SENSOR_ID"));
+  logfile.println(F("# co_sensor_id: CO_SENSOR_ID"));
+  logfile.println(F("# dht22_id: DHT22_ID"));
+  logfile.println(F("# If you swap parts record the new component ID and new configuration date in the file SENSORHERE.ino"));
   logfile.println(F("DATE/TIME,TEMP(degC),HUMID(%),PM2.5_ug/m3,PM2.5_#/0.01ft3,CO_PPM,CO_V,O3_PPB,O3_V"));
 
 #if LOG_TO_SERIAL
@@ -260,16 +260,16 @@ void setup() {
   Serial.println(filename);
   Serial.println(F("# "));
   Serial.println(F("# Sensor Configuration:"));
-  Serial.print(F("# config_date: CONFIG_DATE"));
-  Serial.print(F("# sensor_id: SENSOR_ID"));
-  Serial.print(F("# enclosure_id: ENCLOSURE_ID"));
-  Serial.print(F("# arduino_id: ARDUINO_ID"));
-  Serial.print(F("# datashield_id: DATASHIELD_ID"));
-  Serial.print(F("# sdcard_id: SDCARD_ID"));
-  Serial.print(F("# shinyei_id: SHINYEI_ID"));
-  Serial.print(F("# o3_sensor_id: O3_SENSOR_ID"));
-  Serial.print(F("# co_sensor_id: CO_SENSOR_ID"));
-  Serial.print(F("# dht22_id: DHT22_ID"));
+  Serial.println(F("# config_date: CONFIG_DATE"));
+  Serial.println(F("# sensor_id: SENSOR_ID"));
+  Serial.println(F("# enclosure_id: ENCLOSURE_ID"));
+  Serial.println(F("# arduino_id: ARDUINO_ID"));
+  Serial.println(F("# datashield_id: DATASHIELD_ID"));
+  Serial.println(F("# sdcard_id: SDCARD_ID"));
+  Serial.println(F("# shinyei_id: SHINYEI_ID"));
+  Serial.println(F("# o3_sensor_id: O3_SENSOR_ID"));
+  Serial.println(F("# co_sensor_id: CO_SENSOR_ID"));
+  Serial.println(F("# dht22_id: DHT22_ID"));
   Serial.println(F("# If you swap parts record the new component ID and new configuration date in the file SENSORHERE.ino"));
   Serial.println(F("# TEMP(degC), HUMID(%), PM2.5_ug/m3, PM2.5_#/0.01ft3, CO_PPM, CO_V, O3_PPB, O3_V, YYYY-MM-DD HH:MM:SS"));
 
@@ -314,8 +314,7 @@ void logSensorReadings() {
   if (millis() - timer > LOG_INTERVAL) {
     timer = millis(); // reset the timer
 
-    DateTime now;
-    now = RTC.now();
+    DateTime now = RTC.now();
     int year = now.year();
     int month = now.month();
     int day = now.day();
@@ -327,7 +326,7 @@ void logSensorReadings() {
     DHT22_ERROR_t errorCode;
     errorCode = myDHT22.readData();
     float temp = myDHT22.getTemperatureC();
-    float rhumid = myDHT22.getHumidity();
+    float humid = myDHT22.getHumidity();
     // PM25conc      we have these two as global variables
     // PM25count
     float coPPM = calculateGas(CO);
@@ -337,15 +336,56 @@ void logSensorReadings() {
 
     //////////////////////////////////////////////////////
     //////////////////////////////////////////////////////
+    // Not an elegant solution, but an extensible one
+    logfile.print(temp);
+    logfile.print(", ");
+    logfile.print(humid);
+    logfile.print(", ");
+    logfile.print(PM25conc);
+    logfile.print(", ");
+    logfile.print(PM25count);
+    logfile.print(", ");
+    logfile.print(coPPM);
+    logfile.print(", ");
+    logfile.print(coVolt);
+    logfile.print(", ");
+    logfile.print(o3PPM);
+    logfile.print(", ");
+    logfile.print(o3Volt);
+    logfile.print(", ");
 
-    char buf[100] = "";
-    sprintf(buf, "%-10,%-10d,%-10d,%-10d,%-10d,%-10d,%-10d,%-10d,%.4d-%.2d-%.2d %.2d:%.2d",
-            temp, humid, PM25conc, PM25count, coPPM, coVolt, o3PPM, o3Volt, year, month, day, hour, minute);
-    
-    logfile.println(buf);
-    #if LOG_TO_SERIAL
-    Serial.println(buf);
-    #endif
+    char datetime[25] = "";
+    sprintf(datetime, "%.4d-%.2d-%.2d %.2d:%.2d:%.2d", year, month, day, hour, minute, second);
+    logfile.println(datetime);
+
+#if LOG_TO_SERIAL
+    Serial.print(temp);
+    Serial.print(", ");
+    Serial.print(humid);
+    Serial.print(", ");
+    Serial.print(PM25conc);
+    Serial.print(", ");
+    Serial.print(PM25count);
+    Serial.print(", ");
+    Serial.print(coPPM);
+    Serial.print(", ");
+    Serial.print(coVolt);
+    Serial.print(", ");
+    Serial.print(o3PPM);
+    Serial.print(", ");
+    Serial.print(o3Volt);
+    Serial.print(", ");
+    Serial.println(datetime);
+#endif
+    /* char buf[100] = "";
+      sprintf(buf, " % -10d, % -10d, % -10d, % -10d, % -10d, % -10d, % -10d, % -10d, % .4d - % .2d - % .2d % .2d: % .2d",
+      temp, humid, PM25conc, PM25count, coPPM, coVolt, o3PPM, o3Volt, year, month, day, hour, minute);
+
+      logfile.println(buf);
+      #if LOG_TO_SERIAL
+      Serial.println(buf);
+      #endif
+    */
 
     // write to sd card
     logfile.flush();
