@@ -1,7 +1,3 @@
-#include <FreeStack.h>
-#include <Sdfat.h>
-
-
 /* Air Sensor Everywhere_v.1
    Small Sensors Group - University of Massachusetts Amherst
    Environmental Health Science - Lab of Richard Peltier
@@ -63,18 +59,24 @@
    Real Time Clock:
      To calibrate an Adafruit Sdfat logger RTC, one must
      install a battery on the Sdfat shield, Download the
-     Adafruit RTClib library, and run the ds1307 example
+     Adafruit RTClib library, and run the PCF8523 example
      sketch before loading this air sensor software
 
 */
+#include <Wire.h>
 #include <SPI.h>
 #include <SoftwareSerial.h>
 #include <DHT22.h>
-#include <Wire.h>
+#include <FreeStack.h>
+#include <Sdfat.h>
 #include "RTClib.h"
 #include <avr/sleep.h>
 #include <avr/power.h>
 #include <avr/wdt.h>
+
+//------------------------------------------------------------
+//    Configuration Constants
+//------------------------------------------------------------
 
 //
 // So you want to change a component?
@@ -82,45 +84,49 @@
 // Then the corresponding component ID number below may be changed,
 // and the config_date value should be updated in the format YYYY-MM-DD
 // This new configuration will be recorded into the database.
-char config_date[12] =  "2017-02-20";
-int sensor_id =           1;
-int enclosure_id =        1;
-int arduino_id =          1;
-int datashield_id =       1;
-int sdcard_id =           1;
-int shinyei_id =          1;
-int o3_sensor_id =        1;
-int co_sensor_id =        1;
-int dht22_id =            1;
+//
+
+#define CONFIG_DATE          2017-02-20
+#define SENSOR_ID            1
+#define ENCLOSURE_ID         1
+#define ARDUINO_ID           1
+#define DATASHIELD_ID        1
+#define SDCARD_ID            1
+#define SHINYEI_ID           1
+#define O3_SENSOR_ID         1
+#define CO_SENSOR_ID         1
+#define DHT22_ID             1
 
 // logging options
 #define LOG_INTERVAL 2000
-#define LOG_TO_SERIAL true
+#define LOG_TO_SERIAL falsed
 
 // sleep and wake settings in milliseconds
-// e.g. 1 hour = 3600000
-#define WAKE_DURATION    5400000    //2hrs = 7200000 ms
-#define SLEEP_DURATION   2700000   //30min = 1800000 ms
+// e.g.
+//  30min = 1800000
+//  1hr = 3600000
+//  2hrs = 7200000
+#define WAKE_DURATION    5400000
+#define SLEEP_DURATION   2700000
 
 #define MAX_SLEEP_ITERATIONS   SLEEP_DURATION / 8000
 int sleepIterations = MAX_SLEEP_ITERATIONS;
 
-// RTC object
 RTC_PCF8523 RTC;
 
-// Set sd pin
+// Set SD pin
 #define chipSelect 10
 #define ledPin 13
 SdFat sd;
 SdFile logfile;
 
-
 // DHT-22 Temp and Humidity
 #define DHTPIN 3
 DHT22 myDHT22(DHTPIN);
 
+//
 // Gas sensor settings
-
+//
 enum Gases { CO, O3 };
 
 // Analog read pins
@@ -128,14 +134,12 @@ enum Gases { CO, O3 };
 #define O3_PIN 1
 // Shenyei PM variables
 #define PM_P2_PIN 4
-
 unsigned long duration;
 unsigned long starttime;
 unsigned long sampletime_ms = 300000;   //300sec or 5min
 unsigned long lowpulseoccupancy = 0;
 float ratio = 0;
 float concentration = 0;
-
 float PM25count;
 float PM25conc;
 
@@ -145,12 +149,10 @@ uint32_t lastSleepCycle = millis();
 volatile bool watchdogActivated = false;
 
 void setup() {
-  // for Leonardos, if you want to debug sd issues, uncomment this line
-  // to see serial output
-  //while (!Serial);
 
 #if LOG_TO_SERIAL
   Serial.begin(9600);
+  while (!Serial);
 #endif
 
   Wire.begin();
@@ -165,11 +167,12 @@ void setup() {
   pinMode(10, OUTPUT);
 
   // see if the card is present and can be initialized:
+
   if (!sd.begin(chipSelect)) {      // if you're using an UNO, you can use this line instead
 #if LOG_TO_SERIAL
     Serial.println("Card init. failed!");
 #endif
-    error(2);
+    fatalBlink();
   }
 
   // this creates file with the format 2017_1_23_20h32m_SENSOR001.txt
@@ -182,26 +185,18 @@ void setup() {
   int minute = now.minute();
   char filename[35] = "";
   sprintf(filename, "%.4d-%.2d-%.2d_%.2dh%.2dm_SENSOR%.3d.txt",
-          year % 10000, month % 100, day % 100, hour % 100, minute % 100, sensor_id);
-//  logfile = sd.open(filename, FILE_WRITE);
+          year % 10000, month % 100, day % 100, hour % 100, minute % 100, SENSOR_ID);
 
+  // open logfile for writing, or throw error
   if (!logfile.open(filename, O_RDWR | O_CREAT | O_AT_END)) {
     sd.errorHalt("opening file for write failed");
+    fatalBlink();
   }
-  // use the error() function to flash the LED forever on failure
- /* if ( ! logfile ) {
-#if LOG_TO_SERIAL
-    Serial.print("Couldnt create ");
-    Serial.println(filename);
-#endif
-    error(1);
-  }
-*/
+
 #if LOG_TO_SERIAL
   Serial.print("Writing to ");
   Serial.println(filename);
 #endif
-
   // flashing LED indicated success in writing to sd file
   for (int i = 0; i < 5; i++) {
     digitalWrite(ledPin, HIGH);
@@ -221,65 +216,62 @@ void setup() {
   // See more details of how to change the watchdog in the ATmega328P datasheet
   // around page 50, Watchdog Timer.
   noInterrupts();
-
   // Set the watchdog reset bit in the MCU status register to 0.
   MCUSR &= ~(1 << WDRF);
-
   // Set WDCE and WDE bits in the watchdog control register.
   WDTCSR |= (1 << WDCE) | (1 << WDE);
-
   // Set watchdog clock prescaler bits to a value of 8 seconds.
   WDTCSR = (1 << WDP0) | (1 << WDP3);
-
   // Enable watchdog as interrupt only (no reset).
   WDTCSR |= (1 << WDIE);
-
   // Enable interrupts again.
   interrupts();
 
+  //
+  // File headers
+  //
+  // NOTE: Please don't change the file headers if you intend to load the
+  // datas into the database using the database program. It relies on them
+  // to stay juuuust as they are. -Ben
 
-  // FILE HEADERS
-  // Please don't change the file headers if you intend to load the datas into
-  // the database, using the database program. It relies on them to stay
-  // juuuust as they are. -Ben
-
-  logfile.print("# ");
+  logfile.print(F("# "));
   logfile.println(filename);
-  logfile.println("# ");
+  logfile.println(F("# "));
 
   // Sensor configuration header
   // This information is read into the database to store the current
   // sensor component configuration.
-  logfile.println("# Sensor Configuration:");
-  logfile.print("# config_date: "); logfile.println(config_date);
-  logfile.print("# sensor_id: "); logfile.println(sensor_id);
-  logfile.print("# enclosure_id: "); logfile.println(enclosure_id);
-  logfile.print("# arduino_id: "); logfile.println(arduino_id);
-  logfile.print("# datashield_id: "); logfile.println(datashield_id);
-  logfile.print("# sdcard_id: "); logfile.println(sdcard_id);
-  logfile.print("# shinyei_id: "); logfile.println(shinyei_id);
-  logfile.print("# o3_sensor_id: "); logfile.println(o3_sensor_id);
-  logfile.print("# co_sensor_id: "); logfile.println(co_sensor_id);
-  logfile.print("# dht22_id: "); logfile.println(dht22_id);
-  logfile.print("# If you swap parts record the new component ID and new configuration date in the file SENSORHERE.ino");
-  logfile.println("DATE/TIME,TEMP(degC),HUMID(%),PM2.5_ug/m3,PM2.5_#/0.01ft3,CO_PPM,CO_V,O3_PPB,O3_V");
+  logfile.println(F("# Sensor Configuration:"));
+  logfile.print(F("# config_date: CONFIG_DATE"));
+  logfile.print(F("# sensor_id: SENSOR_ID"));
+  logfile.print(F("# enclosure_id: ENCLOSURE_ID"));
+  logfile.print(F("# arduino_id: ARDUINO_ID"));
+  logfile.print(F("# datashield_id: DATASHIELD_ID"));
+  logfile.print(F("# sdcard_id: SDCARD_ID"));
+  logfile.print(F("# shinyei_id: SHINYEI_ID"));
+  logfile.print(F("# o3_sensor_id: O3_SENSOR_ID"));
+  logfile.print(F("# co_sensor_id: CO_SENSOR_ID"));
+  logfile.print(F("# dht22_id: DHT22_ID"));
+  logfile.print(F("# If you swap parts record the new component ID and new configuration date in the file SENSORHERE.ino"));
+  logfile.println(F("DATE/TIME,TEMP(degC),HUMID(%),PM2.5_ug/m3,PM2.5_#/0.01ft3,CO_PPM,CO_V,O3_PPB,O3_V"));
 
 #if LOG_TO_SERIAL
-  Serial.print("# ");
+  Serial.print(F("# "));
   Serial.println(filename);
-  Serial.println("# ");
-  Serial.print("# config_date: "); Serial.println(config_date);
-  Serial.print("# sensor_id: "); Serial.println(sensor_id);
-  Serial.print("# enclosure_id: "); Serial.println(enclosure_id);
-  Serial.print("# arduino_id: "); Serial.println(arduino_id);
-  Serial.print("# datashield_id: "); Serial.println(datashield_id);
-  Serial.print("# sdcard_id: "); Serial.println(sdcard_id);
-  Serial.print("# shinyei_id: "); Serial.println(shinyei_id);
-  Serial.print("# o3_sensor_id: "); Serial.println(o3_sensor_id);
-  Serial.print("# co_sensor_id: "); Serial.println(co_sensor_id);
-  Serial.print("# dht22_id: "); Serial.println(dht22_id);
-  Serial.println("# If you swap parts record the new component ID and new configuration date in the file SENSORHERE.ino");
-  Serial.println("# TEMP(degC), HUMID(%), PM2.5_ug/m3, PM2.5_#/0.01ft3, CO_PPM, CO_V, O3_PPB, O3_V, YYYY-MM-DD HH:MM:SS");
+  Serial.println(F("# "));
+  Serial.println(F("# Sensor Configuration:"));
+  Serial.print(F("# config_date: CONFIG_DATE"));
+  Serial.print(F("# sensor_id: SENSOR_ID"));
+  Serial.print(F("# enclosure_id: ENCLOSURE_ID"));
+  Serial.print(F("# arduino_id: ARDUINO_ID"));
+  Serial.print(F("# datashield_id: DATASHIELD_ID"));
+  Serial.print(F("# sdcard_id: SDCARD_ID"));
+  Serial.print(F("# shinyei_id: SHINYEI_ID"));
+  Serial.print(F("# o3_sensor_id: O3_SENSOR_ID"));
+  Serial.print(F("# co_sensor_id: CO_SENSOR_ID"));
+  Serial.print(F("# dht22_id: DHT22_ID"));
+  Serial.println(F("# If you swap parts record the new component ID and new configuration date in the file SENSORHERE.ino"));
+  Serial.println(F("# TEMP(degC), HUMID(%), PM2.5_ug/m3, PM2.5_#/0.01ft3, CO_PPM, CO_V, O3_PPB, O3_V, YYYY-MM-DD HH:MM:SS"));
 
 #endif
 }
@@ -303,14 +295,13 @@ void loop() {
       while (millis() - lastSleepCycle < WAKE_DURATION) {
         logSensorReadings();
       }
-
     }
     // Go to sleep!
     sleep();
     lastSleepCycle = millis();
-
   }
 }
+
 
 void logSensorReadings() {
   // if millis() or timer wraps around, we'll just reset it
@@ -323,74 +314,38 @@ void logSensorReadings() {
   if (millis() - timer > LOG_INTERVAL) {
     timer = millis(); // reset the timer
 
-    // fetch the time
     DateTime now;
     now = RTC.now();
-
-    // print date
-    logfile.print(now.year(), DEC); logfile.print("-");
-    logfile.print(now.month(), DEC); logfile.print('-');
-    logfile.print(now.day(), DEC); logfile.print(" ");
-    // print time
-    logfile.print(now.hour(), DEC); logfile.print(':');
-    logfile.print(now.minute(), DEC); logfile.print(':');
-    logfile.print(now.second(), DEC); logfile.print(", ");
-#if LOG_TO_SERIAL
-    // print date
-    Serial.print(now.year(), DEC); Serial.print("-");
-    Serial.print(now.month(), DEC); Serial.print('-');
-    Serial.print(now.day(), DEC); Serial.print(" ");
-    // print time
-    Serial.print(now.hour(), DEC); Serial.print(':');
-    Serial.print(now.minute(), DEC); Serial.print(": ");
-    Serial.print(now.second(), DEC); Serial.print(", ");
-#endif
-
+    int year = now.year();
+    int month = now.month();
+    int day = now.day();
+    int hour = now.hour();
+    int minute = now.minute();
+    int second = now.second();
     // print temperature and humidity
+    // LETS CONVERT TO THE ADAFRUIT lib
     DHT22_ERROR_t errorCode;
     errorCode = myDHT22.readData();
+    float temp = myDHT22.getTemperatureC();
+    float rhumid = myDHT22.getHumidity();
+    // PM25conc      we have these two as global variables
+    // PM25count
+    float coPPM = calculateGas(CO);
+    float coVolt = readVoltage(CO_PIN);
+    float o3PPM = calculateGas(O3);
+    float o3Volt = readVoltage(O3_PIN);
 
-    logfile.print(myDHT22.getTemperatureC()); logfile.print(", ");
-    logfile.print(myDHT22.getHumidity()); logfile.print(", ");
-#if LOG_TO_SERIAL
-    Serial.print(myDHT22.getTemperatureC()); Serial.print(", ");
-    Serial.print(myDHT22.getHumidity()); Serial.print(", ");
-#endif
+    //////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////
 
-    // Shinyei PM readings....EQUATION DIFFERENT FOR EACH SENSOR
-    logfile.print(PM25conc);
-    logfile.print(", "); logfile.print(PM25count);
-    logfile.print(", ");
-
-#if LOG_TO_SERIAL
-    Serial.print(PM25conc);
-    Serial.print(", "); Serial.print(PM25count);
-    Serial.print(", ");
-#endif
-
-    // read gas sensors
-
-    // print CO PPM(Voltage)
-    logfile.print(calculateGas(CO));
-    logfile.print(", "); logfile.print(readVoltage(CO_PIN));
-    logfile.print(", ");
-
-    // print O3 PPM(Voltage)
-    logfile.print(calculateGas(O3));
-    logfile.print(", "); logfile.print(readVoltage(O3_PIN));
-    logfile.println();
-
-#if LOG_TO_SERIAL
-    // print CO PPM(Voltage)
-    Serial.print(calculateGas(CO));
-    Serial.print(", "); Serial.print(readVoltage(CO_PIN));
-    Serial.print(", ");
-
-    // print O3 PPM(Voltage)
-    Serial.print(calculateGas(O3));
-    Serial.print(", "); Serial.print(readVoltage(O3_PIN));
-    Serial.println();
-#endif
+    char buf[100] = "";
+    sprintf(buf, "%-10,%-10d,%-10d,%-10d,%-10d,%-10d,%-10d,%-10d,%.4d-%.2d-%.2d %.2d:%.2d",
+            temp, humid, PM25conc, PM25count, coPPM, coVolt, o3PPM, o3Volt, year, month, day, hour, minute);
+    
+    logfile.println(buf);
+    #if LOG_TO_SERIAL
+    Serial.println(buf);
+    #endif
 
     // write to sd card
     logfile.flush();
@@ -398,19 +353,20 @@ void logSensorReadings() {
 }
 
 
-// blink out an error code
-void error(uint8_t errno) {
-  while (1) {
-    delay(1800);
-    for (int i = 0; i < 10; i++) {
-      digitalWrite(ledPin, HIGH);
-      delay(50);
-      digitalWrite(ledPin, LOW);
-      delay(50);
-    }
-  }
+//
+// readvoltage
+//
+// Converts from the ADC analogRead value (0-1023)
+// and maps it to a 0-5 value.
+//
+float readVoltage(int PIN) {
+  return (analogRead(PIN) * (5.0 / 1023));
 }
-// calcualteGas()
+
+
+//
+// calculateGas()
+//
 // caculate gas performs ppm/ppb conversions on raw data
 // input: gasVoltage - integer analogRead from MICS sensor
 //
@@ -420,7 +376,7 @@ void error(uint8_t errno) {
 // to assign the analog pin number to a variable which can be easily
 // changed if needed. e.g.
 //                  #define NO2_PIN 9
-
+//
 float calculateGas(int gas) {
   float result;
   float voltage;             // v has significant decimals
@@ -445,14 +401,15 @@ float calculateGas(int gas) {
   }
 }
 
-// calculatePM()
+//
+// calculatePM
+//
 // This function runs in the main loop every millisecond,
 // concentration and particle count are only calculated when
 // sampletime_ms has elapsed, sampletime_ms can be adjusted in the
 // PM variables section towards the top of this file
-
+//
 void calculatePM() {
-
   duration = pulseIn(PM_P2_PIN, LOW);
   lowpulseoccupancy = lowpulseoccupancy + duration;
 
@@ -466,12 +423,26 @@ void calculatePM() {
   }
 }
 
-float readVoltage(int PIN) {
-  return (analogRead(PIN) * (5.0 / 1023));
+//
+// fatalBlink
+//
+// Produces the blinky light of death.
+//
+void fatalBlink() {
+  while (1) {
+    delay(1800);
+    for (int i = 0; i < 10; i++) {
+      digitalWrite(ledPin, HIGH);
+      delay(50);
+      digitalWrite(ledPin, LOW);
+      delay(50);
+    }
+  }
 }
 
-
+//
 // Define watchdog timer interrupt.
+//
 ISR(WDT_vect)
 {
   // Set the watchdog activated flag.
@@ -479,7 +450,11 @@ ISR(WDT_vect)
   watchdogActivated = true;
 }
 
+//
+// sleep
+//
 // Put the Arduino to sleep.
+//
 void sleep()
 {
   // Set sleep to full power down.  Only external interrupts or
@@ -499,6 +474,3 @@ void sleep()
   sleep_disable();
   power_all_enable();
 }
-
-
-
