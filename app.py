@@ -8,28 +8,27 @@ from ctypes import *
 import threading
 from time import sleep
 
-def displayConfigInfo(storage_path, project_name):
+def displayConfigInfo(session):
     print("Configuration settings imported from config.py")
     print("Configuration check:")
     #sleep(2)
     print()
-    print("     STORAGE_PATH: " + storage_path)
-    print("     PROJECT_NAME: " + project_name)
+    print("     STORAGE_PATH: " + session.storage_path)
+    print("     PROJECT_NAME: " + session.name)
     print()
     #sleep(3)
 
-def existingProjectDialogue(project_name, project_path, database_path):
-    projectExists = os.path.exists(project_path)
+def existingProjectDialogue(session):
 
-    if (projectExists):
-        print("*** The " + project_name + " project directory already exists at: \n\t" + project_path)
+    if (session.exists):
+        print("*** The " + session.name + " project directory already exists at: \n\t" + session.path)
         print()
         print("*** If you continue you will be importing data into that\n    project folder and database.")
     else:
-        print("Project " + project_name + " does not currently exist at specified STORAGE_PATH");
+        print("Project " + session.name + " does not currently exist at specified STORAGE_PATH");
         print()
-        print("     A new project folder will be created at " + project_path)
-        print("     A new database file will be created at " + database_path)
+        print("     A new project folder will be created at " + session.path)
+        print("     A new database file will be created at " + session.db_path)
 
 
     print()
@@ -41,22 +40,22 @@ def existingProjectDialogue(project_name, project_path, database_path):
         print("Okay! Quitting...")
         sys.exit()
 
-    if (not projectExists):
-        newProject(project_path)
+    if (not session.exists):
+        newProject(session.path)
 def ejectDrive():
     removedrive = 'removedrive ' + DRIVE + ' -L'
     o = os.popen(removedrive).read()
 
-def cardRead(command, yesDevice):
+def cardRead(command, yesDevice, session):
     print("(Re)Insert an SD card with sensor datas!")
     # wait for a drive to show up
     yesDevice.wait()
     yesDevice.clear()
-    files = retrieveDataFiles()
+    files = retrieveDataFiles(session)
     if (len(files) == 0):
         print ("No sensor files found on volume " + DRIVE)
     else:
-        fileImport(files) #list files
+        listFiles(files) 
         if command == 'a':
             print("AUTO MODE: someday you may be able to leave this...maybe with an input in it's own thread...who knows")
             importFiles(files)
@@ -98,7 +97,7 @@ def importFiles(files):
         print("\b")
     print("Importing files..... psych!")
 
-def commandPrompt(files):
+def commandPrompt(files, stopThreadFlag):
     if len(files) > 0:
         print("(i)import files (a)auto import ", end = "")
     command = input("(e)eject drive (q)quit: ")
@@ -111,9 +110,10 @@ def commandPrompt(files):
     #elif command[0] == 'e':
     elif command[0] == 'q':
         win32gui.PostQuitMessage(0)
-        stopThread.set()
+        stopThreadFlag.set()
     ejectDrive()
     return command
+
 class StoppableThread(threading.Thread):
     """Thread class with a stop() method. The thread itself has to check
     regularly for the stopped() condition."""
@@ -239,6 +239,7 @@ class Notification():
                 DRIVE = chr(ord("A") + drive_letter) + ':\\'                       
                 print("Drive", DRIVE, "inserted")
                 Notification.yesDevice.set()
+
         if wparam == DBT_DEVICEREMOVECOMPLETE:
                 DRIVE = None
                 print("Safe to remove drive")
@@ -250,11 +251,13 @@ class Notification():
 
         return 1
 
-
+#
 # function for creating new project directory
+#
 def newProject(project_path):
     print("Creating new directory " + project_path + ".......", end="")
     # make project file path
+
     try:
         os.makedirs(project_path)
     except Exception as e:
@@ -264,12 +267,17 @@ def newProject(project_path):
         sys.exit()
     print("OKAY")
 
+#
+# connectToDB
+#
 # connect to database code is the same whether accessing existing or creating new
 # returns a sqlite3 connection object used to interact with the database
-def connectToDB(database_path, project_exists):
-    print("Connecting to database at " + database_path + ".......", end="")
+#
+def connectToDB(session):
+    print("Connecting to database at " + session.db_path + ".......", end="")
+  
     try:
-        conn = sqlite3.connect(database_path)
+        conn = sqlite3.connect(session.db_path)
     except Exception as e:
         print()
         print("Error: Couldn't connect to the database")
@@ -277,7 +285,7 @@ def connectToDB(database_path, project_exists):
         sys.exit()
     print("OKAY")
     
-    if (not project_exists):
+    if (not session.exists):
         try:
             import schema
         except Exception as e:
@@ -295,8 +303,8 @@ def connectToDB(database_path, project_exists):
             print("Error: Problem creating new database")
             print(e)
             sys.exit()
-        print("OKAY")
-                
+
+        print("OKAY") 
     return conn
 
 def closeDB(conn):
@@ -307,13 +315,15 @@ def closeDB(conn):
     except Exception as e:
         print(e)
 
-
+#
 # getLocations
+#
 # argument: 
 #   c: sqlite3 cursor object
 # returns:
 #  list of (id, location_name) tuples or
 #  None if none found
+#
 def getLocations(c):
     locations_c = c.execute('''SELECT * FROM locations''')
     location = locations_c.fetchone()
@@ -322,13 +332,15 @@ def getLocations(c):
         locations.append(location)
         location = locations_c.fetchone()
     return locations
-            
+#            
 # getLocationID
+#
 # arguments:
 #   cursor object, c
 #   string, location name to get id for
 # returns:
 #   integer - location id
+#
 def getLocationID(c, location):
     loc_t = (location,)
     result = c.execute('''SELECT id FROM locations WHERE location = ?''', loc_t)
@@ -341,56 +353,92 @@ def getLocationID(c, location):
         id = result.fetchone()
         return id[0]
 
+# 
+# selectLocationName
+#
+# Displays a dialogue to select a location already existing in the DB,
+# or create a new location name
+# Returns:
+#   string: location_name
+#
+def selectLocationName(locations):
+    command = "no"
+    while (command != "yes"):
+        print("Please select location of sensor(s): ")
+        print("This is important data to later select sensor data based on where it was.")
+        print()
+
+        for i in range(len(locations)):
+            print("     " + str(i+1) + ": " + str(locations[i][1]))
+        newOption = len(locations) + 1
+        print("     " + str(newOption) + ": " + "Add a new location")
+        print()
+        loc_select = -1
+        # while (loc_select < int(locations[0][0]) or loc_select > newOption): 
+        while (loc_select < 1 or loc_select > newOption): 
+            try:
+                loc_select = int(input("Please enter a number to select an option: "),10)
+            except:
+                loc_select = -1
+        if (loc_select == newOption):
+            location_name = input("Please enter the name of new sensor location: ")
+        else:
+            location_name = locations[loc_select-1][1]
+        command = input("Location name: " + location_name + "\nDoes this look okay (yes or no)? ")
+    return location_name
+
+#
 # retrieveDataFiles
+#
 # Looks for sensor data files on an inserted drive, checks for the
 # string "SENSORS" in the file name to establish
 # returns:
 #   List of tuples: [(filename,currpath,destpath,toTransfer), ...)]
-def retrieveDataFiles(): 
+#
+def retrieveDataFiles(session): 
      files = os.listdir(path=DRIVE) #get paths too
      files = [i for i in files if 'SENSOR' in i]
      file_info = []
-     #if (len(files) == 0):
-     #    print("No sensor files found on this drive :(")
-     #else:
-     try:
-         # handy dictionary to build destination file path
-         months = {
-             '0':'Unknown',
-             '1':'January',
-             '2':'February',
-             '3':'March',
-             '4':'April',
-             '5':'May',
-             '6':'June',
-             '7':'July',
-             '8':'August',
-             '9':'September',
-             '10':'October',
-             '11':'November',
-             '12':'December'
-         }
-         for f in files:
+     months = {
+         '00':'Unknown',
+         '01':'January',
+         '02':'February',
+         '03':'March',
+         '04':'April',
+         '05':'May',
+         '06':'June',
+         '07':'July',
+         '08':'August',
+         '09':'September',
+         '10':'October',
+         '11':'November',
+         '12':'December'
+     }
+     for f in files:
+         try:
              # construct destination path
              # project_path\location\Jan\1\SENSOR001\
              f_s = f.split('_')
-             month = months[f_s[1]] if int(f_s[1]) in range(1,12) else months['0']
-             dest_path = os.path.join(project_path, location_name, f_s[0], month)
+             date = f_s[0].split('-')
+             month = months[date[1]] if int(date[1]) in range(1,12) else months['00']
+             dest_path = os.path.join(session.path, session.location_name, date[0], month)
              file_info.append(
                  (f, 
                  os.path.join(DRIVE,f), 
                  dest_path, 
                  not os.path.exists(os.path.join(dest_path,f)))
              )
-     except Exception as e:
+         except Exception as e:
+             print("There were sensor files, but something went wrong with their naming format. It ought to be YYYY-MM-DD_HHhMMm_SENSOR000.txt")   
              print(e)
              return [] 
-     return file_info
-
-
-# fileImport
-# lists sensor files to be transferred 
-def fileImport(files):
+     return file_info 
+#
+# listFiles
+# # Lists sensor files which exist on the SD card and
+# prints an * after if they are new
+#
+def listFiles(files):
     print("Sensor files present on drive " + DRIVE)
     print()
     # List of tuples: [(filename, currpath, destpath, toTransfer), ...)]
@@ -403,15 +451,18 @@ def fileImport(files):
     print()
     print(str(len(files)) + " sensor data files found. " + str(transferCount) + " are new and can be transfered.")
         
-
+#
 # validatorGen
-#    validatorGen('Do you like sushi?',['yes', 'no', 'gross'])
-# Generates a function...
-# A wrapper for input() which validates input, and rerequests
+#
+#  xx  validatorGen('Do you like sushi?',['yes', 'no', 'gross'])
+#
+# Generates a function which is a wrapper
+# for input() which validates input, and rerequests
 # on bad input parameters. The first argument is the prompt for the
 # user, the second argument is a list which contains valid input.
 # returns:
 #   valid user input or None
+#
 def validatorGen(*arg):
     prompt = arg[0]
     arguments = arg[1]
@@ -432,9 +483,16 @@ def validatorGen(*arg):
         return None
     return validator
 
-
-def confirmator(input_validator):
+#
+# confirmator
+#
+# Secondary wrapper prompt so user may evaluate their input.
+# It's an "Are you sure?" prompt
+#
+def confirmator(input_validator=None):
     verify = 'n';
     while verify[0] == 'n':
-        userInput = input_validator()
-        verify = input("You entered " + userInput + ". Do you wish to continue (y or n)? ")
+        if (input_validator != None):
+            userInput = input_validator()
+            print("You entered " + userInput + ". ", end='')
+        verify = input("Do you wish to continue (y or n)? ")

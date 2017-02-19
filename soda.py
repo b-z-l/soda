@@ -4,20 +4,18 @@ from shutil import copy
 from shutil import rmtree
 import sqlite3
 import win32api, win32con, win32gui
-from ctypes import *
 import threading
 from time import sleep
 from app import *
 
 
-### Main program entry here
-
 os.system('cls')
 
-print("SODA: Sensor Organizing Data Application")
+print("SODA: Small Sensor Organizing Database Application")
 # Adding a few little sleep delays to give the user
 # a moment to verify the config settings are correct
 #sleep(2)
+
 try:
     import config
 except:
@@ -29,100 +27,78 @@ project_name = config.PROJECT_NAME.upper()
 project_path = os.path.join(storage_path, project_name)
 database_name = project_name + ".db"
 database_path = os.path.join(project_path,database_name)
+project_exists = os.path.exists(project_path)
+
+# SessionInfo objects, just a handy way to pass session data to functions
+class SessionInfo(object):
+    def __init__(self, project_name, project_path, storage_path, \
+            db_name, db_path, exists, location_name=None, location_id=None):
+        SessionInfo.name = project_name
+        SessionInfo.path = project_path
+        SessionInfo.storage_path = storage_path
+        SessionInfo.db_name = db_name
+        SessionInfo.db_path = db_path
+        SessionInfo.location_name = location_name
+        SessionInfo.location_id = location_id
+        SessionInfo.exists = exists
+
+# Declare a new object without location ID, we'll get that in a minute
+session = SessionInfo(project_name, project_path, storage_path, database_name, database_path, project_exists)
+
 global DRIVE
 DRIVE = None
 
-
-displayConfigInfo(storage_path, project_name)
-
-
-existingProjectDialogue(project_name, project_path, database_path)
-
-conn = connectToDB(database_path, projectExists)
-# a cursor object is used to execute database inserts and queries
+displayConfigInfo(session)
+existingProjectDialogue(session)
+conn = connectToDB(session)
 c = conn.cursor()
 
-# location dialogue
+# location name dialogue and id retrieval
 
 locations = getLocations(c)
-#if (locations == None):
- #   command = "no"
-  #  while (command != "yes"):
-   #     location_name = input("Please enter the name of new sensor location: ")
-    #    print()
-     #   command = input("Location name: " + location_name + "\n\n Does this look okay (yes or no)?")
-#else:
-command = "no"
-while (command != "yes"):
-    print("Please select location of sensor(s): ")
-    print("This is important data to later select sensor data based on where it was.")
-    print()
+session.location_name = selectLocationName(locations)
+session.location_id = getLocationID(c, session.location_name)
 
-    for i in range(len(locations)):
-        print("     " + str(i+1) + ": " + str(locations[i][1]))
-    newOption = len(locations) + 1
-    print("     " + str(newOption) + ": " + "Add a new location")
-    print()
-    loc_select = -1
-    # while (loc_select < int(locations[0][0]) or loc_select > newOption): 
-    while (loc_select < 1 or loc_select > newOption): 
-        try:
-            loc_select = int(input("Please enter a number to select an option: "),10)
-        except:
-            loc_select = -1
-    if (loc_select == newOption):
-        location_name = input("Please enter the name of new sensor location: ")
-    else:
-        location_name = locations[loc_select-1][1]
-    command = input("Location name: " + location_name + "\nDoes this look okay (yes or no)? ")
+print("YOU HAVE SELECTED LOCATION " + session.location_name + " with id " + str(session.location_id))
 
-location_id = getLocationID(c, location_name)
-print("YOU HAVE SELECTED LOCATION " + location_name + " with id " + str(location_id))
 closeDB(conn)
 
-
+# Start windows message loop in its own thread because it's blocking
 if __name__ == '__main__':
-    
-    yesDeviceFlag = threading.Event()
+
+    # Flags to communicate that a device has arrived or departed, and to stop the
+    # message loop (PumpMessages) when it's time to quit.
+    deviceFlag = threading.Event()
     stopThreadFlag = threading.Event()
 
-    def winLoop(stopthreadFlag, yesDeviceFlag):
+    def winLoop(stopthreadFlag, deviceFlag):
         global DRIVE
-        global w
-        w = Notification(stopThreadFlag, yesDeviceFlag)
+        w = Notification(stopThreadFlag, deviceFlag)
         win32gui.PumpMessages()
-        #while(1):
-        #    win32gui.PumpWaitingMessages()
-        #    sleep(.1)
     
-    SDlisten = threading.Thread(name='message loop', target=winLoop, args=(stopThreadFlag, yesDeviceFlag))
+    SDlisten = threading.Thread(name='message loop', target=winLoop, args=(stopThreadFlag, deviceFlag))
     SDlisten.start()
         
-
-### Main program loop
-
-
-
+#
+# Main program loop
+#
 command = 'none'
-files = cardRead(command, yesDeviceFlag)
+files = cardRead(command, deviceFlag, session)
 try:
     while (True):
         if command[0] != 'a':
-            command = commandPrompt(files)
+            command = commandPrompt(files, stopThreadFlag)
         if command[0] == 'q':
             break
-        cardRead(command, yesDeviceFlag)
+        cardRead(command, deviceFlag, session)
 except Exception as e:
     print(e)
     command = 'q'
 
-global w
 print("this is the end...")
 if command[0] == 'q':
-   #win32gui.sendmessage
-   # w.onDestroy()
     SDlisten.join()
-    closeDB()
+    closeDB(conn)
     print('Bye!')
 
 
