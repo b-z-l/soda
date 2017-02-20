@@ -1,5 +1,6 @@
 import sys
 import os
+import csv
 from shutil import copy
 from shutil import rmtree
 import sqlite3
@@ -63,6 +64,7 @@ def cardRead(command, yesDevice, session):
     return files
 
 def importFiles(files):
+#   files: [(filename,currpath,destpath,toTransfer), ...)]
     # first just copy over files
     # 
     # do I load the entire file into memory?
@@ -82,18 +84,74 @@ def importFiles(files):
     #  after entire file is inserted, commit change
     #
     # no more files, CLOSE DB 
-    for i in range(5):
-        print("AAAAAAAAAAAAAAAAAA", end="\r")
-        sleep(.2)
-        print("\b")
-        print("BBBBBBBBBBBBBBBBBB",end="\r")
-        sleep(.2)
-        print("\b")
-        print("CCCCCCCCCCCCCCCCCC",end="\r")
-        sleep(.2)
-        print("\b")
-        print("DDDDDDDDDDDDDDDDDD",end="\r")
-        sleep(.2)
+
+    ###########################################################
+    # copy files
+        for file in files:
+            file_name = file[0]
+            curr_path= file[1]
+            dest_dir = file[2]
+            file_path = os.buildpath(dest_dir, file_name) 
+            if file[3] == True:
+                try:
+                    print("Copying file " + file_name)
+                    shutil.copyfile(curr_path, dest_dir)
+                except Exception as e:
+                    print("Error copying file")
+                    print(e)
+                try:
+                    with open(file_path, newline='') as logfile:
+                        logreader = csv.reader(logfile, delimiter=",", skipinitialspace=True)
+
+                        # Extract config info and insert into sensor table.
+                        configList = ""                      
+                        config = {}
+                        row = next(logreader)
+                        while row[0][0] == '#':
+                            if ':' in row[0]:
+                                configList += row[0]
+                            row = next(logreader)
+                        configList = configList[1:]                        
+                        configList = configList.split('#')
+`                       for i in configList:
+                            param = i.split[': ']
+                            try:
+
+                                config[param[0]] = param[1]
+                            except:
+                                pass
+                        c.execute('''INSERT INTO sensors SELECT date(?),?,?,?,?,?,?,?,?,?''',
+                                config['date'],
+                                int(config['sensor_id']),
+                                int(config['enclosure_id']),
+                                int(config['arduino_id']),
+                                int(config['datashield_id']),
+                                int(config['sdcard_id']),
+                                int(config['shinyei_id']),
+                                int(config['o3_sensor_id']),
+                                int(config['co_sensor_id']),
+                                int(config['dht22_id'])
+                        )
+                        for row in logreader:
+                            c.execute('''INSERT INTO sensor_datas SELECT ?,?,?,?,?,?,?,?,?,?,datetime(?)''',
+                                    float(row[0]),float(row[1]),float(row[2]),float(row[3]),float(row[4]),
+                                    float(row[5]),float(row[6]),float(row[7]),
+                                    int(config['sensor_id']),session.location_id, row[8]
+                            )
+                    except Exception as e:
+                        print("We had a problem trying to load this file into the database :(")
+                        print("Removing file " + file_name)
+                        try:
+                            os.remove(file_path)
+                        except:
+                            print("couldn't delete file?")
+                        print(e)
+
+    #############################################################
+    for i in range(1,26):
+        c = chr(ord('A')+i)
+        sleep(.1)
+        print(c*40,end="\r")
         print("\b")
     print("Importing files..... psych!")
 
@@ -332,6 +390,7 @@ def getLocations(c):
         locations.append(location)
         location = locations_c.fetchone()
     return locations
+
 #            
 # getLocationID
 #
