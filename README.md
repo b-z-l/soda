@@ -23,7 +23,7 @@ This is the directory where all project folders are created. This could be somet
 ### Schema.py
 
 Schema.py is read in by SODA to create a database on its first run in a new project directory. It defines three tables in the database.
-
+**NOTE: SODA reads data from the sensor file IN THE SAME ORDER IT IS ORGANIZED IN THE DATABASE. The order of the configuration is less important.**
 <table style="width:100%">
   <tr>
     <th>locations</th>
@@ -87,6 +87,6 @@ Schema.py is read in by SODA to create a database on its first run in a new proj
   </tr>
       
                               
-###### NOTE: SODA reads data from the sensor file IN THE SAME ORDER IT IS ORGANIZED IN THE DATABASE. The order of the configuration is less importan
+
                                   
  
