@@ -27,20 +27,7 @@ This file contains two important variables which you should set.
 ##### PROJECT_NAME
  
 This is the name of the project we are currently working on. It determines the name of the directory where the project files will be saved, and the database file in that folder will take this name.
-
-##### PROJECT_DIRECTORY
-
-This is the directory where all project folders are created. This could be something like 'C:\\Users\\JoeUser\\Dropbox\\Small-Sensors\\'
-
-### Schema.py
-
-Schema.py is read in by SODA to create a database on its first run in a new project directory. It defines three tables in the database.
-**NOTE: SODA inserts values into the database, IN THE SAME ORDER as written in the file. That is, don't change the order of values the sensors write to file**
-<table style="width:100%">
-  <tr>
-    <th>locations</th>
-    <th>sensors</th> 
-    <th>sensor_datas</th>
+  
   </tr>
   <tr>
     <td>location_id</td>
