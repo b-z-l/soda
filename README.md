@@ -31,32 +31,62 @@ Schema.py is read in by SODA to create a database on its first run in a new proj
     <th>sensor_datas</th>
   </tr>
   <tr>
-    <td>Jill</td>
-    <td>Smith</td> 
-    <td>50</td>
+    <td>location_id</td>
+    <td>sensor_id</td> 
+    <td>temperature</td>
   </tr>
   <tr>
-    <td>Eve</td>
-    <td>Jackson</td> 
-    <td>94</td>
+    <td>location</td>
+    <td>arduino_id</td> 
+    <td>humidity</td>
   </tr>
-</table>
-
-locations        sensors          sensor_datas
-----------       ---------        --------------
-location_id      date             temperature
-location         sensor_id        humidity
-                 arduino_id       PM25_x
-                 datashield_id    PM25_y
-                 sdcard_id        co_ppm
-                 shinyei_id       co_v
-                 o3_sensor_id     o3_ppb
-                 co_sensor_id     o3_v
-                 dht22_id         sensor_id
-                                  location_id
-                                  datetime
-   
-                                  
-####### NOTE: SODA reads data from the sensor file IN THE SAME ORDER IT IS ORGANIZED IN THE DATABASE. The order of the configuration is less importan
+    <tr>
+    <td></td>
+    <td>datashield_id</td> 
+    <td>PM25_x</td>
+  </tr>
+    <tr>
+    <td></td>
+    <td>sdcard_id</td> 
+    <td>PM25_y</td>
+  </tr>
+    <tr>
+    <td></td>
+    <td>shinyei_id</td> 
+    <td>co_ppm</td>
+  </tr>
+    <tr>
+    <td></td>
+    <td>o3_sensor_id</td> 
+    <td>co_v</td>
+  </tr>
+    <tr>
+    <td></td>
+    <td>co_sensor_id</td> 
+    <td>o3_ppb</td>
+  </tr>
+    <tr>
+    <td></td>
+    <td>dht22_id</td> 
+    <td>o3_v</td>
+  </tr>
+    <tr>
+    <td></td>
+    <td>date</td> 
+    <td>sensor_id</td>
+  </tr>
+    <tr>
+    <td></td>
+    <td></td> 
+    <td>location_id</td>
+  </tr>
+    <tr>
+    <td></td>
+    <td></td> 
+    <td>datetime</td>
+  </tr>
+      
+                              
+###### NOTE: SODA reads data from the sensor file IN THE SAME ORDER IT IS ORGANIZED IN THE DATABASE. The order of the configuration is less importan
                                   
  
