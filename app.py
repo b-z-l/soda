@@ -1,7 +1,7 @@
 import sys
 import os
 import csv
-from shutil import copy
+from shutil import copy2
 from shutil import rmtree
 import sqlite3
 import win32api, win32con, win32gui
@@ -47,7 +47,7 @@ def ejectDrive():
     removedrive = 'removedrive ' + DRIVE + ' -L'
     o = os.popen(removedrive).read()
 
-def cardRead(command, yesDevice, session):
+def cardRead(command, yesDevice, session, c):
     print("(Re)Insert an SD card with sensor datas!")
     # wait for a drive to show up
     yesDevice.wait()
@@ -59,111 +59,90 @@ def cardRead(command, yesDevice, session):
         listFiles(files) 
         if command == 'a':
             print("AUTO MODE: someday you may be able to leave this...maybe with an input in it's own thread...who knows")
-            importFiles(files)
+            importFiles(files, session, c)
             ejectDrive()
     return files
 
-def importFiles(files):
-#   files: [(filename,currpath,destpath,toTransfer), ...)]
-    # first just copy over files
-    # 
-    # do I load the entire file into memory?
-    # should i read from SD first, try inserts, then if successful, copy the file.. that sounds good...
-    
-    # wrap in try
-
-    # derive sensor # from file name? no...
-    # use csv library
-    # read in each line of file
-    #  - we need to look for some special lines
-    #    - sensor info line, hardware IDs
-    #    - look for header indicating start of data
-    #    - throw away all lines until then
-    #  read in line, format tuple of data to INSERT
-    #  try insertion
-    #  after entire file is inserted, commit change
-    #
-    # no more files, CLOSE DB 
-
-    ###########################################################
-    # copy files
-        for file in files:
+def importFiles(files, session, c):
+    for file in files:
+        if file[3] == True:
             file_name = file[0]
             curr_path= file[1]
             dest_dir = file[2]
-            file_path = os.buildpath(dest_dir, file_name) 
-            if file[3] == True:
-                try:
-                    print("Copying file " + file_name)
-                    shutil.copyfile(curr_path, dest_dir)
-                except Exception as e:
-                    print("Error copying file")
-                    print(e)
-                try:
-                    with open(file_path, newline='') as logfile:
-                        logreader = csv.reader(logfile, delimiter=",", skipinitialspace=True)
+            file_path = os.path.join(dest_dir, file_name) 
+            try:
+                print("Copying file " + file_name)
+                if not os.path.exists(dest_dir):
+                    os.makedirs(dest_dir)
+                copy2(curr_path, dest_dir)
+            except Exception as e:
+                print("Error copying file")
+                print(e)
+            try:
+                with open(file_path, newline='') as logfile:
+                    logreader = csv.reader(logfile, delimiter=",", skipinitialspace=True)
 
-                        # Extract config info and insert into sensor table.
-                        configList = ""                      
-                        config = {}
+                    # Extract config info and insert into sensor table.
+                    configList = ""                      
+                    sensor_config = {}
+                    row = next(logreader)
+                    while row[0][0] == '#':
+                        if ':' in row[0]:
+                            configList += row[0]
                         row = next(logreader)
-                        while row[0][0] == '#':
-                            if ':' in row[0]:
-                                configList += row[0]
-                            row = next(logreader)
-                        configList = configList[1:]                        
-                        configList = configList.split('#')
-`                       for i in configList:
-                            param = i.split[': ']
-                            try:
-
-                                config[param[0]] = param[1]
-                            except:
-                                pass
+                    configList = configList[1:]                        
+                    configList = configList.split('# ')
+                    configList = configList[1:]
+                    for i in configList:
+                        param = i.split(': ')
+                        sensor_config[param[0]] = param[1]
+                    try:
                         c.execute('''INSERT INTO sensors SELECT date(?),?,?,?,?,?,?,?,?,?''',
-                                config['date'],
-                                int(config['sensor_id']),
-                                int(config['enclosure_id']),
-                                int(config['arduino_id']),
-                                int(config['datashield_id']),
-                                int(config['sdcard_id']),
-                                int(config['shinyei_id']),
-                                int(config['o3_sensor_id']),
-                                int(config['co_sensor_id']),
-                                int(config['dht22_id'])
+                                (sensor_config['config_date'],
+                                int(sensor_config['sensor_id']),
+                                int(sensor_config['enclosure_id']),
+                                int(sensor_config['arduino_id']),
+                                int(sensor_config['datashield_id']),
+                                int(sensor_config['sdcard_id']),
+                                int(sensor_config['shinyei_id']),
+                                int(sensor_config['o3_sensor_id']),
+                                int(sensor_config['co_sensor_id']),
+                                int(sensor_config['dht22_id']))
                         )
+                    except:
+                       pass
+                       # print('Loading data from existing sensor: ' + sensor_config['sensor_id'])
+                    try:
                         for row in logreader:
                             c.execute('''INSERT INTO sensor_datas SELECT ?,?,?,?,?,?,?,?,?,?,datetime(?)''',
-                                    float(row[0]),float(row[1]),float(row[2]),float(row[3]),float(row[4]),
-                                    float(row[5]),float(row[6]),float(row[7]),
-                                    int(config['sensor_id']),session.location_id, row[8]
+                                    (float(row[0]),float(row[1]),float(row[2]),float(row[3]),
+                                    float(row[4]),float(row[5]),float(row[6]),float(row[7]),
+                                    int(sensor_config['sensor_id']),session.location_id, row[8])
                             )
-                    except Exception as e:
-                        print("We had a problem trying to load this file into the database :(")
-                        print("Removing file " + file_name)
-                        try:
-                            os.remove(file_path)
-                        except:
-                            print("couldn't delete file?")
-                        print(e)
+                    except sqlite3.Error as r:
+                        print(r)
+                        raise
+            except Exception as e:
+                print("We had a problem trying to load this file into the database :(")
+                print("Removing file " + file_name)
+                try:
+                    os.remove(file_path)
+                except:
+                    print("couldn't delete file?")
+                print(e)
 
-    #############################################################
-    for i in range(1,26):
-        c = chr(ord('A')+i)
-        sleep(.1)
-        print(c*40,end="\r")
-        print("\b")
-    print("Importing files..... psych!")
 
-def commandPrompt(files, stopThreadFlag):
-    if len(files) > 0:
-        print("(i)import files (a)auto import ", end = "")
+def commandPrompt(files, stopThreadFlag, c, session):
+    for f in files:
+        if f[3] == True:
+            print("(i)import files (a)auto import ", end = "")
+            break
     command = input("(e)eject drive (q)quit: ")
     if command[0] == 'a':
         print("Auto import mode")
 
     if command[0] == 'a' or command[0] == 'i':
-        importFiles(files)
+        importFiles(files, session, c)
       #  ejectDrive()
     #elif command[0] == 'e':
     elif command[0] == 'q':
@@ -270,7 +249,6 @@ class Notification():
         )
     def onDestroy(hwnd, msg, wparam, lparam):
         win32gui.PostQuitMessage(0)
-        print("I DIE")
         return
 
     def onDeviceChange(self, hwnd, msg, wparam, lparam):
@@ -303,7 +281,6 @@ class Notification():
                 print("Safe to remove drive")
                 if (Notification.stopThread.is_set()):
                     win32gui.PostQuitMessage(0)
-                    print("I DIE")
                     return
                 #print ("Drive ", chr(ord("A") + drive_letter, " being ejected!"));
 
@@ -358,6 +335,7 @@ def connectToDB(session):
             for i in schema.schema:
                 c.execute(i)
         except Exception as e:
+            print()
             print("Error: Problem creating new database")
             print(e)
             sys.exit()
@@ -494,7 +472,8 @@ def retrieveDataFiles(session):
      return file_info 
 #
 # listFiles
-# # Lists sensor files which exist on the SD card and
+# 
+# Lists sensor files which exist on the SD card and
 # prints an * after if they are new
 #
 def listFiles(files):
@@ -507,6 +486,8 @@ def listFiles(files):
         if ( i[3] == True):
             print(" *")
             transferCount = transferCount + 1
+        else:
+            print()
     print()
     print(str(len(files)) + " sensor data files found. " + str(transferCount) + " are new and can be transfered.")
         

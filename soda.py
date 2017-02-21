@@ -61,7 +61,6 @@ session.location_id = getLocationID(c, session.location_name)
 
 print("YOU HAVE SELECTED LOCATION " + session.location_name + " with id " + str(session.location_id))
 
-closeDB(conn)
 
 # Start windows message loop in its own thread because it's blocking
 if __name__ == '__main__':
@@ -83,14 +82,14 @@ if __name__ == '__main__':
 # Main program loop
 #
 command = 'none'
-files = cardRead(command, deviceFlag, session)
+files = cardRead(command, deviceFlag, session, c)
 try:
     while (True):
         if command[0] != 'a':
-            command = commandPrompt(files, stopThreadFlag)
+            command = commandPrompt(files, stopThreadFlag, c, session)
         if command[0] == 'q':
             break
-        cardRead(command, deviceFlag, session)
+        files = cardRead(command, deviceFlag, session, c)
 except Exception as e:
     print(e)
     command = 'q'
