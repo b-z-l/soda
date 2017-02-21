@@ -6,6 +6,18 @@ SODA waits for a new volume to be inserted into the computer (SD card, USB stick
  
 Files are identified by looking for 'SENSOR' in the filename then parses the name for the year and month the log file was created, it checks if that file exists in the project directory, if it doesn't exist, SODA will copy the file into the project directory specified by the user, and import its data into the database. If files are found with the same name, it won't try and import the data again.
 
+## Notes
+
+The header is parsed by the application. The character # leads all lines of the file header. Don't change stuff around, things will not work.
+
+### Depedencies
+
+SODA relies on another application to eject volumes automagically when we are done importing data. The application can be downloaded here: HTTP://www.JSDFSKLDFJ.COM and should do in the directory with the other SODA files.
+
+### So, you want to change parts on a particular sensor?
+
+
+
 ## Project Files
 
 ### Config.py
@@ -85,14 +97,15 @@ Schema.py is read in by SODA to create a database on its first run in a new proj
     <td></td> 
     <td>datetime</td>
   </tr>
+</table>
   
-  ### Soda.py
+### Soda.py
   
-  This is the primary application flow.
+This is the primary application flow.
   
-  ### App.py
+### App.py
   
-  This holds the meat of the application, routines which are called from Soda.py.
+This holds the meat of the application, routines which are called from Soda.py.
       
                               
 
