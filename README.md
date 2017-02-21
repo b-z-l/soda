@@ -1,12 +1,12 @@
 # SODA: Small Sensor Organizing Database Application
 
-This application waits for drives to be interted, 
+SODA waits for a new volume to be inserted into the computer (SD card, USB stick, hard drive, etc)., and scans the files on that volume for sensor files with the format:
 
-## How This Works
+ YYYY-MM-DD_HHhMMm_SENSOR000.txt
+ 
+Files are identified by looking for 'SENSOR' in the filename then parses the name for the year and month the log file was created, it checks if that file exists in the project directory, if it doesn't exist, SODA will copy the file into the project directory specified by the user, and import its data into the database. If files are found with the same name, it won't try and import the data again.
 
-SODA waits for a new volume to be inserted into the computer (SD card, USB stick, hard drive, etc). It scans the filenames of the drive for files which include the string "SENSOR". It then parses the filename for the year and month the log file was created, it checks if that file exists in the project directory, if it doesn't exist, SODA will copy the file into the project directory specified by the user, and import its data into the database.
-
-## Important Files
+## Project Files
 
 ### Config.py
 
@@ -23,7 +23,7 @@ This is the directory where all project folders are created. This could be somet
 ### Schema.py
 
 Schema.py is read in by SODA to create a database on its first run in a new project directory. It defines three tables in the database.
-**NOTE: SODA reads data from the sensor file IN THE SAME ORDER IT IS ORGANIZED IN THE DATABASE. The order of the configuration is less important.**
+**NOTE: SODA inserts values into the database, IN THE SAME ORDER as written in the file. That is, don't change the order of values the sensors write to file**
 <table style="width:100%">
   <tr>
     <th>locations</th>
@@ -85,6 +85,14 @@ Schema.py is read in by SODA to create a database on its first run in a new proj
     <td></td> 
     <td>datetime</td>
   </tr>
+  
+  ### Soda.py
+  
+  This is the primary application flow.
+  
+  ### App.py
+  
+  This holds the meat of the application, routines which are called from Soda.py.
       
                               
 
