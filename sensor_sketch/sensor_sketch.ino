@@ -15,13 +15,13 @@
    4  - Shinyei PM2.5 -purple
    5  -
    6  -
-   7  -
-   8  -
-   9  -
-   10 - reserved for Sdfat
-   11 - reserved for Sdfat
-   12 - reserved for Sdfat
-   13 - reserved for Sdfat (LED power)
+   7  - 
+   8  - O3 sensor power
+   9  - CO sensor power
+   10 - reserved for Sdfat *              
+   11 - reserved for Sdfat *
+   12 - reserved for Sdfat *
+   13 - reserved for Sdfat * LED power
 
    Analog Pins
    AO - CO - yellow
@@ -129,11 +129,15 @@ DHT22 myDHT22(DHTPIN);
 //
 enum Gases { CO, O3 };
 
+#define O3_POWER_PIN 8
+#define CO_POWER_PIN 9
+
 // Analog read pins
-#define CO_PIN 0
-#define O3_PIN 1
+#define CO_PIN A0
+#define O3_PIN A1
+
 // Shenyei PM variables
-#define PM_P2_PIN 4
+#define PM_P2_PIN 7
 unsigned long duration;
 unsigned long starttime;
 unsigned long sampletime_ms = 300000;   //300sec or 5min
