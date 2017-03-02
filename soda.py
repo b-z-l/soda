@@ -99,8 +99,3 @@ if command[0] == 'q':
     SDlisten.join()
     closeDB(conn)
     print('Bye!')
-
-
-    # sample data tuples
-    # sameplesensor = (1, 1, 1, 1, 1, 1, 1, 1, 1, '2017
-    # sensorinsert = '''INSERT INTO sensors 1, 1, 1, 1, 1, 1, 1, 1, 1, date('now')'''

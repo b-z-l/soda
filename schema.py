@@ -3,6 +3,7 @@ schema = ['''CREATE TABLE locations (
 		location TEXT NOT NULL)'''
 	,
 	'''CREATE TABLE sensors (
+		date TEXT,
 		sensor_id INTEGER,
 		enclosure_id INTEGER,
 		arduino_id INTEGER,
@@ -12,8 +13,7 @@ schema = ['''CREATE TABLE locations (
 		o3_sensor_id INTEGER,
 		co_sensor_id INTEGER,
 		dht22_id INTEGER,
-		date TEXT,
-		PRIMARY KEY (sensor_id, date))'''
+		PRIMARY KEY (date, sensor_id))'''
 	,
 	'''CREATE TABLE sensor_datas (
 		temperature REAL,
@@ -21,7 +21,7 @@ schema = ['''CREATE TABLE locations (
 		pm25_x REAL,
 		pm25_y REAL,
 		co_ppm REAL,
-		co_v REAL,(
+		co_v REAL,
 		o3_ppb REAL,
 		o3_v REAL,
 		sensor_id INTEGER,

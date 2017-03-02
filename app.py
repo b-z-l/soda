@@ -20,7 +20,6 @@ def displayConfigInfo(session):
     #sleep(3)
 
 def existingProjectDialogue(session):
-
     if (session.exists):
         print("*** The " + session.name + " project directory already exists at: \n\t" + session.path)
         print()

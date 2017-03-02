@@ -161,14 +161,10 @@ void setup() {
     logfile.println("RTC failed");
 
   pinMode(ledPin, OUTPUT);
-
-  // make sure that the default chip select pin is set to
-  // output, even if you don't use it:
-  pinMode(10, OUTPUT);
+  pinMode(chipSelect, OUTPUT);
 
   // see if the card is present and can be initialized:
-
-  if (!sd.begin(chipSelect)) {      // if you're using an UNO, you can use this line instead
+  if (!sd.begin(chipSelect)) {
 #if LOG_TO_SERIAL
     Serial.println("Card init. failed!");
 #endif
@@ -205,16 +201,10 @@ void setup() {
     delay(200);
   }
 
-  // Set PM pins
   pinMode(PM_P2_PIN, INPUT);
-
   starttime = millis();
 
   // Watchdog timer setup for waking from sleep
-
-  // This next section of code is timing critical, so interrupts are disabled.
-  // See more details of how to change the watchdog in the ATmega328P datasheet
-  // around page 50, Watchdog Timer.
   noInterrupts();
   // Set the watchdog reset bit in the MCU status register to 0.
   MCUSR &= ~(1 << WDRF);
@@ -292,7 +282,6 @@ void setup() {
   Serial.println(DHT22_ID);
   Serial.println(F("# If you swap parts record the new component ID and new configuration date in the file SENSORHERE.ino"));
   Serial.println(F("# TEMP(degC),HUMID(%),PM2.5_ug/m3,PM2.5_#/0.01ft3,CO_PPM,CO_V,O3_PPB,O3_V,YYYY-MM-DD HH:MM:SS"));
-
 #endif
 }
 
