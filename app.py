@@ -268,12 +268,13 @@ class Notification():
                 #print("It's a volume!")
 
                 dev_broadcast_volume = DEV_BROADCAST_VOLUME.from_address(lparam)
-                if dev_broadcast_volume.dbcv_flags & DBTF_MEDIA:
-                    print("with some media")
-                drive_letter = drive_from_mask(dev_broadcast_volume.dbcv_unitmask)
-                DRIVE = os.path.normpath(chr(ord("A") + drive_letter) + ':/')                     
-                print("Drive", DRIVE, "inserted")
-                Notification.yesDevice.set()
+                #if dev_broadcast_volume.dbcv_flags & DBTF_MEDIA:
+                if DBTF_MEDIA:
+                    #print("with some media")
+                    drive_letter = drive_from_mask(dev_broadcast_volume.dbcv_unitmask)
+                    DRIVE = os.path.normpath(chr(ord("A") + drive_letter) + ':/')                     
+                    print("Drive", DRIVE, "inserted")
+                    Notification.yesDevice.set()
 
         if wparam == DBT_DEVICEREMOVECOMPLETE:
                 DRIVE = None
