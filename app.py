@@ -431,8 +431,11 @@ def selectLocationName(locations):
 # returns:
 #   List of tuples: [(filename,currpath,destpath,toTransfer), ...)]
 #
-def retrieveDataFiles(session): 
-     files = os.listdir(path=DRIVE) #get paths too
+def retrieveDataFiles(session):
+     if os.path.exists(DRIVE):
+         files = os.listdir(path=DRIVE) #get paths too
+     else:
+         return []
      files = [i for i in files if 'SENSOR' in i]
      file_info = []
      months = {
