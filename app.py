@@ -271,7 +271,7 @@ class Notification():
                 if dev_broadcast_volume.dbcv_flags & DBTF_MEDIA:
                     print("with some media")
                 drive_letter = drive_from_mask(dev_broadcast_volume.dbcv_unitmask)
-                DRIVE = chr(ord("A") + drive_letter) + ':\\'                       
+                DRIVE = os.path.normpath(chr(ord("A") + drive_letter) + ':/')                     
                 print("Drive", DRIVE, "inserted")
                 Notification.yesDevice.set()
 
